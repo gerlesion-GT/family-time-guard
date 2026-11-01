@@ -1,0 +1,8 @@
+bin/
+obj/
+publish/
+package/
+*.user
+.vs/
+*.zip
+TestResults/

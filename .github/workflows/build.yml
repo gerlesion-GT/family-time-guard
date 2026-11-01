@@ -1,0 +1,105 @@
+name: Build and test
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Unit tests
+        run: dotnet test tests/FamilyTimeGuard.Tests -c Release
+
+      - name: Build the Windows program
+        run: >
+          dotnet publish src/FamilyTimeGuard -c Release -r win-x64 --self-contained
+          -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
+
+      - name: Assemble package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force package | Out-Null
+          Copy-Item publish/FamilyTimeGuard.exe package/
+          Copy-Item installer/* package/
+          Copy-Item docs/INSTALL-GUIDE.txt, docs/SETTINGS-GUIDE.txt package/
+          Compress-Archive -Path package/* -DestinationPath FamilyTimeGuard.zip -Force
+
+      - name: Smoke test (install, talk to the Guard, upgrade, uninstall)
+        shell: powershell
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $pw = ConvertTo-SecureString 'Test-Passw0rd!x9' -AsPlainText -Force
+          New-LocalUser -Name ftgkid -Password $pw | Out-Null
+          Add-LocalGroupMember -SID 'S-1-5-32-544' -Member ftgkid   # installer should demote this
+
+          & .\package\Install.ps1 -ChildName Chip -Account ftgkid -Pin 2468 -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "Install failed ($LASTEXITCODE)" }
+
+          if ((Get-Service FamilyTimeGuard).Status -ne 'Running') { throw 'Service is not running' }
+          if (Get-LocalGroupMember -SID 'S-1-5-32-544' | Where-Object { $_.Name -like '*\ftgkid' }) { throw 'Child account is still an administrator' }
+          if ((Get-ItemPropertyValue 'HKLM:\SOFTWARE\Policies\Google\Chrome' 'DnsOverHttpsMode') -ne 'off') { throw 'Chrome policy not set' }
+
+          function Send-Guard($json) {
+            $c = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'FamilyTimeGuard', 'InOut')
+            $c.Connect(5000)
+            $w = New-Object System.IO.StreamWriter($c); $w.AutoFlush = $true
+            $r = New-Object System.IO.StreamReader($c)
+            $w.WriteLine($json)
+            $line = $r.ReadLine()
+            $c.Dispose()
+            Write-Host "Guard answered: $line"
+            return ($line | ConvertFrom-Json)
+          }
+          $bad = Send-Guard '{"type":"parent","parent":{"pin":"0000","action":"pause","minutes":1}}'
+          if ($bad.ok) { throw 'Wrong PIN was accepted' }
+          $good = Send-Guard '{"type":"parent","parent":{"pin":"2468","action":"pause","minutes":1}}'
+          if (-not $good.ok) { throw 'Correct PIN was rejected' }
+          $resume = Send-Guard '{"type":"parent","parent":{"pin":"2468","action":"resume","minutes":0}}'
+          if (-not $resume.ok) { throw 'Resume failed' }
+          $report = Send-Guard '{"type":"report","foregroundTitle":"x","foregroundProcess":"y.exe"}'
+          if ($report.enforced) { throw 'Runner session should not be enforced' }
+
+          $exe = Join-Path $env:ProgramFiles 'FamilyTimeGuard\FamilyTimeGuard.exe'
+          & $exe check-config
+          if ($LASTEXITCODE -ne 0) { throw 'check-config failed' }
+
+          # Upgrade in place keeps settings
+          & .\package\Install.ps1 -NonInteractive
+          if ($LASTEXITCODE -ne 0) { throw "Upgrade failed ($LASTEXITCODE)" }
+          $cfg = Get-Content (Join-Path $env:ProgramData 'FamilyTimeGuard\config.json') -Raw | ConvertFrom-Json
+          $chip = $cfg.children | Where-Object { $_.name -eq 'Chip' }
+          if (-not ($chip.windowsAccounts -contains 'ftgkid')) { throw 'Settings lost on upgrade' }
+
+          Get-Content (Join-Path $env:ProgramData 'FamilyTimeGuard\logs\service.log')
+
+          & .\package\Uninstall.ps1 -NonInteractive -RemoveData
+          Start-Sleep -Seconds 2
+          if (Get-Service FamilyTimeGuard -ErrorAction SilentlyContinue) { throw 'Service still installed' }
+          if (Select-String -Path "$env:SystemRoot\System32\drivers\etc\hosts" -Pattern 'FamilyTimeGuard' -Quiet) { throw 'hosts file not cleaned' }
+          Write-Host 'Smoke test passed.'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: FamilyTimeGuard
+          path: package/
+
+      - name: Publish release
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${{ github.ref_name }}" FamilyTimeGuard.zip --title "Family Time Guard ${{ github.ref_name }}" --notes-file docs/RELEASE-NOTES.md

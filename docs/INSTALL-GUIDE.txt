@@ -1,0 +1,91 @@
+FAMILY TIME GUARD - INSTALL GUIDE
+=================================
+
+Do these steps on EACH child's computer (Boong's and Chip's).
+Time needed: about 15-20 minutes per computer.
+
+
+STEP 1 - Give yourself a parent account (skip if you already have one)
+-----------------------------------------------------------------------
+The kids must NOT be administrators, otherwise they could switch the Guard off.
+You need your own administrator account with a password the kids don't know.
+
+  1. Open Start > Settings > Accounts > Other users.
+     (On some versions: Settings > Accounts > Family & other users.)
+  2. Click "Add account" > "I don't have this person's sign-in information"
+     > "Add a user without a Microsoft account".
+  3. Name it e.g. "Parent" and choose a password. Answer the security questions.
+  4. Click the new account > "Change account type" > choose "Administrator" > OK.
+
+The child should have their own separate account (for example "Chip").
+The installer will switch the child's account to "Standard" for you if needed.
+
+
+STEP 2 - Install
+----------------
+  1. Sign in to the computer with YOUR parent account
+     (or stay in the child's account - Windows will ask for your parent password).
+  2. Download FamilyTimeGuard.zip, right-click it > "Extract All..." > Extract.
+  3. Open the extracted folder and double-click  Install.cmd
+       - If Windows says "Windows protected your PC": click "More info" > "Run anyway".
+         (This appears because the app is home-made and not sold in a store.)
+       - Click "Yes" when Windows asks for permission.
+  4. Answer the questions:
+       - Whose computer is this?  -> 1 for Boong, 2 for Chip
+       - Which Windows account does the child use?  -> pick the number
+       - Choose a parent PIN (4-12 digits). Keep it secret.
+  5. Wait for "All done!".
+
+
+STEP 3 - Check that it works (5 minutes)
+----------------------------------------
+  1. Sign in as the child.
+  2. Within a few seconds a small round clock icon appears near the time (bottom-right).
+     If you don't see it, click the little "^" arrow next to the clock.
+  3. Click the icon: it shows game time, YouTube time and bedtime for today.
+  4. Open YouTube in Chrome for a minute, then click the icon again:
+     the YouTube time left should go down.
+  5. Right-click the icon > "Parent options..." > type your PIN.
+     Try "+15 min" for games to see that it works.
+
+Bedtime test (optional): temporarily set the child's bedtime ("lockAt") to a few
+minutes from now in the settings (see SETTINGS-GUIDE.txt). Watch for the warning,
+the full-screen bedtime message and the log-off, then set the time back.
+
+
+WHAT THE KIDS WILL SEE
+----------------------
+  - The clock icon: green = plenty of time, orange = under 10 minutes, red = time is up.
+  - Pop-ups at 10 minutes and 2 minutes left, so they can save their game.
+  - When game time is up, games close and won't reopen until tomorrow.
+  - When YouTube time is up, the YouTube tab closes and YouTube won't load until tomorrow.
+  - 15, 5 and 1 minute before bedtime: warnings. At bedtime: a full-screen message
+    and the computer logs off after 60 seconds. If they sign in again during the night,
+    it logs off again after 60 seconds.
+  - Homework, Office, school websites, Scratch and Roblox Studio never use up their time.
+
+
+FOR PARENTS: START MENU SHORTCUTS
+---------------------------------
+Start > "Family Time Guard" folder:
+  - Edit settings (parents)        change bedtimes and daily minutes
+  - Check status (parents)         see if the Guard is running and if settings are OK
+  - Open activity logs (parents)   what was played/watched today, and when
+These ask for your parent password, so the kids can't use them.
+
+
+UPGRADING TO A NEW VERSION
+--------------------------
+Extract the new zip and run Install.cmd again. Your settings and PIN are kept.
+
+
+REMOVING
+--------
+Run Uninstall.cmd (from the zip, or from C:\Program Files\FamilyTimeGuard).
+
+
+SOMETHING WRONG?
+----------------
+  - Run "Check status (parents)" from the Start menu.
+  - Technical log: C:\ProgramData\FamilyTimeGuard\logs\service.log
+  - Emergency: Parent options > "Pause all rules" (1 or 3 hours), or run Uninstall.cmd.

@@ -1,0 +1,76 @@
+FAMILY TIME GUARD - CHANGING THE RULES
+======================================
+
+Open: Start > Family Time Guard > "Edit settings (parents)".
+Notepad opens the settings file. Change the numbers, then File > Save.
+The Guard picks up the change within about 10 seconds - no restart needed.
+
+After saving, run "Check status (parents)": it tells you if you made a typing mistake.
+If the file has a mistake, the Guard keeps using the previous good settings.
+
+Tip: only change the values (the parts after the colon). Keep the quotes "" and commas.
+
+
+BEDTIME
+-------
+Each child has two bedtime rules:
+
+    "schoolNights":  { "lockAt": "21:00", "unlockAt": "06:30" },
+    "weekendNights": { "lockAt": "22:00", "unlockAt": "07:00" },
+
+  - schoolNights  = nights before a school day (Sunday to Thursday nights)
+  - weekendNights = nights before a weekend day or holiday (Friday and Saturday nights)
+  - lockAt   = when the computer locks in the evening (24-hour clock, e.g. "21:30")
+  - unlockAt = when it can be used again in the morning
+
+
+DAILY MINUTES
+-------------
+    "schoolDayBudget": { "gamesMinutes": 45,  "youTubeMinutes": 30 },
+    "weekendBudget":   { "gamesMinutes": 120, "youTubeMinutes": 60 },
+
+  - schoolDayBudget = Monday to Friday
+  - weekendBudget   = Saturday, Sunday and holidays
+  - Use 0 for "not allowed at all that day" and -1 for "no limit".
+
+
+HOLIDAYS AND SCHOOL BREAKS
+--------------------------
+Dates listed here use the weekend minutes, and the night before uses the weekend bedtime:
+
+    "holidayDates": [ "2027-02-05", "2027-02-06", "2027-02-08" ],
+
+If the kids have school on Saturday, change:
+
+    "weekendDays": [ "Sunday" ],
+
+
+WHICH GAMES ARE COUNTED
+-----------------------
+In the "games" section:
+  - processNames: program names that are games (e.g. "RobloxPlayerBeta.exe").
+    To find a game's program name: open Task Manager while it runs > right-click the
+    game > "Go to details". Add the name to this list.
+  - pathContains: everything installed by Steam, Epic, Xbox app etc. counts automatically.
+  - neverCountProcessNames: programs that never count (Roblox Studio, Steam itself, ...).
+  - websiteTitleKeywords: web game sites (Poki, CrazyGames, ...) count as game time.
+
+
+FRIENDLY SUGGESTIONS
+--------------------
+"suggestions" is the list of ideas shown to the child when their time runs out.
+Write your own, for example "Practice piano" or "Read 20 pages".
+
+
+QUICK CHANGES WITHOUT EDITING
+-----------------------------
+On the child's computer: right-click the clock icon > "Parent options..." > PIN:
+  - +15 / +30 / +60 minutes of games or YouTube (today only)
+  - Pause all rules for 1 or 3 hours (e.g. a family movie or a school project)
+  - Resume now
+
+
+TIME ZONE
+---------
+All times use Hanoi time ("timeZone": "Asia/Ho_Chi_Minh"), even if someone changes the
+Windows clock's time zone.
