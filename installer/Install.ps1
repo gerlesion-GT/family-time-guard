@@ -150,7 +150,9 @@ if ($Pin -or $needPin) {
         } until ($ok)
         $Pin = $p1
     }
-    $Pin | & $Exe set-pin
+    # Pass the PIN through an environment variable (not visible in the process list, no encoding issues).
+    $env:FTG_NEW_PIN = $Pin
+    try { & $Exe set-pin } finally { Remove-Item Env:\FTG_NEW_PIN -ErrorAction SilentlyContinue }
     if ($LASTEXITCODE -ne 0) { Fail "Could not save the PIN." }
 }
 

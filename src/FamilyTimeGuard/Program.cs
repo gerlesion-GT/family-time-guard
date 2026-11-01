@@ -140,7 +140,14 @@ internal static class Cli
 
     public static int SetPin()
     {
-        var pin = Console.ReadLine()?.Trim();
+        // The installer passes the PIN in FTG_NEW_PIN; otherwise read it from the keyboard.
+        var pin = Environment.GetEnvironmentVariable("FTG_NEW_PIN");
+        if (string.IsNullOrEmpty(pin))
+        {
+            Console.Write("New parent PIN (4-12 digits): ");
+            pin = Console.ReadLine();
+        }
+        pin = pin?.Trim().Trim('\uFEFF', '\u200B').Trim();
         if (!PinHasher.IsValidPin(pin)) throw new ArgumentException("The PIN must be 4 to 12 digits.");
         var cfg = Load();
         cfg.ParentPinHash = PinHasher.Hash(pin!);
