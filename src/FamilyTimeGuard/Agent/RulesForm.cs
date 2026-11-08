@@ -32,7 +32,7 @@ internal sealed class RulesForm : Form
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
         grid.ColumnStyles.Add(new ColumnStyle(SizeType.AutoSize));
 
-        Label Head(string t) => new() { Text = t, AutoSize = true, Font = new Font("Segoe UI Semibold", 10.5f), Margin = new Padding(6, 10, 18, 4) };
+        Label Head(string t) => new() { Text = t, AutoSize = true, UseMnemonic = false, Font = new Font("Segoe UI Semibold", 10.5f), Margin = new Padding(6, 10, 18, 4) };
         Label Name(string t) => new() { Text = t, AutoSize = true, Anchor = AnchorStyles.Left, Margin = new Padding(0, 8, 18, 4) };
 
         grid.Controls.Add(Head("Minutes per day"), 0, 0);
