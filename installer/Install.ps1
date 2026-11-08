@@ -134,7 +134,7 @@ if (-not $copied) {
     Fail "Could not replace $Exe because it is still in use. The previous version is running again. Restart the computer and run the installer again."
 }
 Unblock-File -Path $Exe -ErrorAction SilentlyContinue
-foreach ($doc in 'INSTALL-GUIDE.txt', 'SETTINGS-GUIDE.txt', 'Status.cmd', 'Logs.cmd') {
+foreach ($doc in 'INSTALL-GUIDE.txt', 'SETTINGS-GUIDE.txt', 'PHONE-GUIDE.txt', 'Status.cmd', 'Logs.cmd', 'Setup-Phone.cmd', 'Setup-Phone.ps1') {
     $p = Join-Path $PSScriptRoot $doc
     if (Test-Path $p) { Copy-Item $p $InstallDir -Force }
 }
@@ -176,6 +176,25 @@ if ($Pin -or $needPin) {
     if ($LASTEXITCODE -ne 0) { Fail "Could not save the PIN." }
 }
 
+# ---------------------------------------------------------------- phone remote
+$remoteReady = (Get-Content $ConfigFile -Raw) -match '"ownerChatId":\s*-?\d'
+if (-not $NonInteractive -and -not $remoteReady) {
+    Step "Phone remote (Telegram)"
+    Say "  With the phone remote you can check time left, give extra time, change limits,"
+    Say "  lock the computer and get alerts - from anywhere."
+    $answer = Read-Host "  Set it up now? You need Telegram on your phone (about 3 minutes) [Y/n]"
+    if ($answer -notmatch '^[Nn]') {
+        $phoneArgs = @{ FromInstaller = $true }
+        if ($ChildName) { $phoneArgs.PcName = "$ChildName's PC" }
+        & (Join-Path $InstallDir 'Setup-Phone.ps1') @phoneArgs
+    } else {
+        Say "  Skipped. Set it up later from Start > Family Time Guard > Set up phone remote (parents)."
+    }
+} elseif ($remoteReady) {
+    Say ""
+    Say "  Phone remote: already connected."
+}
+
 # ---------------------------------------------------------------- service
 Step "Starting the Guard"
 $binPath = "`"$Exe`" --service"
@@ -204,6 +223,11 @@ try {
     $lnk = $shell.CreateShortcut((Join-Path $startMenu 'Check status (parents).lnk'))
     $lnk.TargetPath = 'powershell.exe'
     $lnk.Arguments = "-NoProfile -WindowStyle Hidden -Command Start-Process '$statusCmd' -Verb RunAs"
+    $lnk.IconLocation = "$Exe,0"
+    $lnk.Save()
+    $lnk = $shell.CreateShortcut((Join-Path $startMenu 'Set up phone remote (parents).lnk'))
+    $lnk.TargetPath = 'powershell.exe'
+    $lnk.Arguments = "-NoProfile -WindowStyle Hidden -Command Start-Process '$(Join-Path $InstallDir 'Setup-Phone.cmd')' -Verb RunAs"
     $lnk.IconLocation = "$Exe,0"
     $lnk.Save()
     $lnk = $shell.CreateShortcut((Join-Path $startMenu 'Open activity logs (parents).lnk'))

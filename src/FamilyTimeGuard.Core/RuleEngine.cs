@@ -20,6 +20,8 @@ public sealed class TickResult
     public string Child { get; set; } = "";
     public bool Paused { get; set; }
     public bool Bedtime { get; set; }
+    /// <summary>A parent locked the computer from the phone (enforced like bedtime).</summary>
+    public bool ParentLocked { get; set; }
     public DateTime? NextBedtimeLocal { get; set; }
     public DateTime? UnlockAtLocal { get; set; }
 
@@ -36,6 +38,9 @@ public sealed class TickResult
     public bool BlockYouTube { get; set; }
 
     public List<Notice> Notices { get; } = [];
+
+    /// <summary>Things worth telling the parent about, e.g. "games-used-up".</summary>
+    public List<string> Events { get; } = [];
 }
 
 /// <summary>
@@ -54,13 +59,15 @@ public static class RuleEngine
         Observation obs,
         DateTime localNow,
         TimeSpan elapsed,
-        bool paused)
+        bool paused,
+        bool parentLocked = false)
     {
-        var r = new TickResult { Child = child.Name, Paused = paused };
+        if (parentLocked) paused = false; // an explicit lock wins over a pause
+        var r = new TickResult { Child = child.Name, Paused = paused, ParentLocked = parentLocked };
         var today = DateOnly.FromDateTime(localNow);
         var budget = Schedule.BudgetFor(cfg, child, today);
 
-        r.Bedtime = Schedule.IsBedtime(cfg, child, localNow);
+        r.Bedtime = parentLocked || Schedule.IsBedtime(cfg, child, localNow);
         r.NextBedtimeLocal = Schedule.NextBedtime(cfg, child, localNow);
         r.UnlockAtLocal = Schedule.UnlockTime(cfg, child, localNow);
 
@@ -107,8 +114,9 @@ public static class RuleEngine
                     r.KillGames = obs.GameProcessRunning;
                     r.CloseForegroundTab |= fgGameSite;
                 }
-                WarnOnce(r, usage, playingGames, "games0", Notice.Big, "Game time is over for today",
-                    $"Great playing, {child.Name}! Games are closed until tomorrow. Idea: {Suggest(child)}.");
+                if (WarnOnce(r, usage, playingGames, "games0", Notice.Big, "Game time is over for today",
+                    $"Great playing, {child.Name}! Games are closed until tomorrow. Idea: {Suggest(child)}."))
+                    r.Events.Add("games-used-up");
             }
             else if (playingGames)
             {
@@ -126,8 +134,9 @@ public static class RuleEngine
             {
                 r.BlockYouTube = true;
                 r.CloseForegroundTab |= fgYouTube;
-                WarnOnce(r, usage, fgYouTube, "yt0", Notice.Big, "YouTube time is over for today",
-                    $"YouTube is closed until tomorrow. Idea: {Suggest(child)}.");
+                if (WarnOnce(r, usage, fgYouTube, "yt0", Notice.Big, "YouTube time is over for today",
+                    $"YouTube is closed until tomorrow. Idea: {Suggest(child)}."))
+                    r.Events.Add("youtube-used-up");
             }
             else if (fgYouTube)
             {
@@ -144,11 +153,12 @@ public static class RuleEngine
         return r;
     }
 
-    private static void WarnOnce(TickResult r, UsageDay usage, bool condition, string flag, string kind, string title, string message)
+    private static bool WarnOnce(TickResult r, UsageDay usage, bool condition, string flag, string kind, string title, string message)
     {
-        if (!condition || usage.Flags.Contains(flag)) return;
+        if (!condition || usage.Flags.Contains(flag)) return false;
         usage.Flags.Add(flag);
         r.Notices.Add(new Notice(kind, title, message));
+        return true;
     }
 
     /// <summary>A parent gave extra time: allow the warnings to show again.</summary>

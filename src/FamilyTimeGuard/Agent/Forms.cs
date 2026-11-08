@@ -107,7 +107,7 @@ internal sealed class BedtimeForm : Form
     private readonly Label _countdown;
     private bool _allowClose;
 
-    public BedtimeForm(string childName, string? unlockAt)
+    public BedtimeForm(string childName, string? unlockAt, string? lockMessage = null)
     {
         FormBorderStyle = FormBorderStyle.None;
         WindowState = FormWindowState.Maximized;
@@ -130,10 +130,13 @@ internal sealed class BedtimeForm : Form
         };
 
         layout.Controls.Add(new Label(), 0, 0);
-        layout.Controls.Add(Centered($"It's bedtime{(string.IsNullOrEmpty(childName) ? "" : ", " + childName)}.", Theme.Huge), 0, 1);
+        var title = lockMessage is null
+            ? $"It's bedtime{(string.IsNullOrEmpty(childName) ? "" : ", " + childName)}."
+            : "Computer locked";
+        layout.Controls.Add(Centered(title, Theme.Huge), 0, 1);
         _countdown = Centered("", Theme.Large);
         layout.Controls.Add(_countdown, 0, 2);
-        layout.Controls.Add(Centered(unlockAt is null ? "Sleep well!" : $"The computer unlocks at {unlockAt}. Sleep well!", Theme.Large), 0, 3);
+        layout.Controls.Add(Centered(lockMessage ?? (unlockAt is null ? "Sleep well!" : $"The computer unlocks at {unlockAt}. Sleep well!"), Theme.Large), 0, 3);
         layout.Controls.Add(new Label(), 0, 4);
         Controls.Add(layout);
     }
@@ -264,3 +267,73 @@ internal static class ParentActions
         }
     }
 }
+
+/// <summary>The child asks the parent (on their phone) for more time.</summary>
+internal sealed class AskForTimeForm : Form
+{
+    public AskForTimeForm()
+    {
+        Text = "Ask for more time";
+        FormBorderStyle = FormBorderStyle.FixedDialog;
+        MaximizeBox = MinimizeBox = false;
+        StartPosition = FormStartPosition.CenterScreen;
+        ClientSize = new Size(400, 300);
+        Font = Theme.Body;
+        TopMost = true;
+
+        var y = 18;
+        Controls.Add(new Label { Text = "What for?", Location = new Point(20, y), AutoSize = true, Font = Theme.Title });
+        y += 32;
+        var games = new RadioButton { Text = "Games", Location = new Point(24, y), AutoSize = true, Checked = true };
+        var youtube = new RadioButton { Text = "YouTube", Location = new Point(140, y), AutoSize = true };
+        var kindPanel = new Panel { Location = new Point(0, y - 4), Size = new Size(400, 32) };
+        games.Location = new Point(24, 4); youtube.Location = new Point(140, 4);
+        kindPanel.Controls.AddRange([games, youtube]);
+        Controls.Add(kindPanel);
+        y += 40;
+        Controls.Add(new Label { Text = "How long?", Location = new Point(20, y), AutoSize = true, Font = Theme.Title });
+        y += 32;
+        var minutes = new ComboBox { Location = new Point(24, y), Width = 140, DropDownStyle = ComboBoxStyle.DropDownList };
+        minutes.Items.AddRange(["15 minutes", "30 minutes", "60 minutes"]);
+        minutes.SelectedIndex = 0;
+        Controls.Add(minutes);
+        y += 40;
+        Controls.Add(new Label { Text = "Message (optional):", Location = new Point(20, y), AutoSize = true });
+        y += 24;
+        var note = new TextBox { Location = new Point(24, y), Width = 350, MaxLength = 150, PlaceholderText = "e.g. I finished my homework!" };
+        Controls.Add(note);
+        y += 40;
+        var send = new Button { Text = "Send", Location = new Point(194, y), Size = new Size(85, 32) };
+        var cancel = new Button { Text = "Close", Location = new Point(289, y), Size = new Size(85, 32), DialogResult = DialogResult.Cancel };
+        var result = new Label { Location = new Point(20, y + 40), Size = new Size(360, 40), ForeColor = Color.DarkGreen };
+        send.Click += async (_, _) =>
+        {
+            send.Enabled = false;
+            var r = await Task.Run(() =>
+            {
+                try
+                {
+                    return PipeClientCall.Send(new AgentRequest
+                    {
+                        Type = "request-time",
+                        Request = new TimeRequest
+                        {
+                            Kind = youtube.Checked ? "youtube" : "games",
+                            Minutes = minutes.SelectedIndex switch { 1 => 30, 2 => 60, _ => 15 },
+                            Note = note.Text,
+                        },
+                    }, 4000);
+                }
+                catch (Exception ex) { return new AgentResponse { Ok = false, Error = "Cannot reach Family Time Guard: " + ex.Message }; }
+            });
+            result.ForeColor = r.Ok ? Color.DarkGreen : Color.Firebrick;
+            result.Text = r.Ok ? r.Message : r.Error;
+            if (!r.Ok) send.Enabled = true;
+        };
+        Controls.AddRange([send, cancel, result]);
+        AcceptButton = send;
+        CancelButton = cancel;
+        ClientSize = new Size(400, y + 90);
+    }
+}
+

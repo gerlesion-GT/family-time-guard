@@ -1,0 +1,75 @@
+FAMILY TIME GUARD - PHONE REMOTE (TELEGRAM)
+===========================================
+
+Control the kids' computers from anywhere with Telegram on your phone.
+Only you can use it: each computer is paired with your Telegram account and
+ignores messages from anyone else.
+
+
+SETTING IT UP (about 3 minutes per computer)
+--------------------------------------------
+Each computer needs its OWN bot: one for Boong's PC, one for Chip's PC.
+
+On the child's computer, in YOUR parent account:
+  1. Start > Family Time Guard > "Set up phone remote (parents)"
+     (the installer also offers this). Click "Yes" when Windows asks.
+  2. Follow the steps in the window:
+       - Open https://web.telegram.org in the browser and sign in.
+       - Talk to @BotFather: send /newbot, choose a name (e.g. "Chip PC Guard")
+         and a username ending in "bot" (e.g. chip_pc_guard_bot).
+       - Copy the key BotFather gives you and paste it into the setup window.
+         Keep this key private.
+  3. The window shows a 6-digit code. Open your new bot in Telegram (on your phone
+     or in Telegram Web), tap Start and send:   /pair 123456   (your code)
+  4. You get "Paired!" in Telegram. Sign out of Telegram Web on the child's computer.
+
+Tip: pin both bot chats in Telegram so they are easy to find.
+
+
+COMMANDS
+--------
+  /status               time left right now, and bedtime
+  /today                what was played and watched today
+  /rules                current daily limits and bedtimes
+
+  /bonus games 30       30 extra minutes of games today
+  /bonus youtube 15     15 extra minutes of YouTube today
+
+  /set school games 60      change the daily limit (school days)
+  /set weekend youtube 90   change the daily limit (weekends)
+                            use -1 for "no limit", 0 for "not allowed"
+  /bedtime school 21:30     change bedtime on school nights (Sun-Thu)
+  /bedtime weekend 22:30    change bedtime on weekend nights (Fri-Sat)
+  /wakeup school 06:30      change the morning unlock time
+
+  /pause 2h             switch all rules off for a while (also bedtime)
+  /resume               rules on again
+  /lock                 lock the computer now, until tomorrow morning
+  /lock 1h              lock it for an hour
+  /unlock               end the lock
+
+  /help                 show the commands
+
+If one computer is used by both kids, add the name: /bonus Chip games 30
+
+
+WHAT YOU RECEIVE AUTOMATICALLY
+------------------------------
+  - "Ask for more time" requests from the kids, with buttons to approve or say no.
+    (Kids can ask up to 5 times a day; requests expire after 30 minutes.)
+  - Alerts: game or YouTube time used up, logged off at bedtime, signing in during
+    the night, the clock helper being stopped, wrong parent PIN attempts, and when
+    someone uses the parent options on the computer.
+  - An evening summary at 21:30: minutes used, games played, YouTube videos watched.
+    (Change the time with "dailySummaryAt" in the settings, or leave it empty for none.)
+
+
+GOOD TO KNOW
+------------
+  - Messages reach a computer only while it is switched on and online. Commands sent
+    while it is off are handled as soon as it comes back on.
+  - The computer only connects out to Telegram; nothing on it is opened to the internet.
+  - If Telegram only works with a VPN on the kids' home network, the computers cannot
+    reach it either. A proxy can be set with "proxy" in the telegram settings.
+  - To disconnect: run "Set up phone remote" again with a new bot, or uninstall.
+    To stop a bot completely, send /deletebot to @BotFather.

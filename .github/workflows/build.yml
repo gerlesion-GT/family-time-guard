@@ -35,7 +35,7 @@ jobs:
           New-Item -ItemType Directory -Force package | Out-Null
           Copy-Item publish/FamilyTimeGuard.exe package/
           Copy-Item installer/* package/
-          Copy-Item docs/INSTALL-GUIDE.txt, docs/SETTINGS-GUIDE.txt package/
+          Copy-Item docs/INSTALL-GUIDE.txt, docs/SETTINGS-GUIDE.txt, docs/PHONE-GUIDE.txt package/
           Compress-Archive -Path package/* -DestinationPath FamilyTimeGuard.zip -Force
 
       - name: Smoke test (install, talk to the Guard, upgrade, uninstall)
@@ -96,6 +96,18 @@ jobs:
           & $exe check-config
           if ($LASTEXITCODE -ne 0) { throw 'check-config failed' }
 
+          # Phone remote: a fake bot key must be refused by Telegram, and never appear in any output.
+          $env:FTG_TELEGRAM_TOKEN = '123456789:AAFakeFakeFakeFakeFakeFakeFakeFake12'
+          $tgOut = (& $exe telegram-setup --pc-name 'Test PC' 2>&1 | Out-String)
+          $tgCode = $LASTEXITCODE
+          Remove-Item Env:\FTG_TELEGRAM_TOKEN
+          Write-Host "telegram-setup with a fake key (exit $tgCode): $tgOut"
+          if ($tgCode -ne 5) { throw "Expected exit code 5 for a rejected bot key, got $tgCode" }
+          if ($tgOut -match 'FakeFake') { throw 'The bot key appeared in the output' }
+          if ((Get-Content (Join-Path $env:ProgramData 'FamilyTimeGuard\config.json') -Raw) -match 'FakeFake') { throw 'The bot key was stored in plain text' }
+          & $exe telegram-test
+          if ($LASTEXITCODE -ne 4) { throw 'telegram-test should say the remote is not set up' }
+
           # Upgrade in place keeps settings. Keep the old exe locked for a few seconds, like a tray helper
           # that is still closing in a child's session: the installer must wait for it instead of failing.
           $lock = Start-Job -ArgumentList $exe -ScriptBlock {
@@ -132,5 +144,5 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $tag = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { 'v0.1.${{ github.run_number }}' }
+          $tag = if ('${{ github.ref_type }}' -eq 'tag') { '${{ github.ref_name }}' } else { 'v0.2.${{ github.run_number }}' }
           gh release create $tag FamilyTimeGuard.zip --target '${{ github.sha }}' --title "Family Time Guard $tag" --notes-file docs/RELEASE-NOTES.md --latest

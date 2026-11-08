@@ -36,6 +36,9 @@ internal static class Program
                 "add-account" => Cli.AddAccount(args),
                 "check-config" => Cli.CheckConfig(),
                 "cleanup" => Cli.Cleanup(),
+                "telegram-setup" => Remote.TelegramSetup.Run(args).GetAwaiter().GetResult(),
+                "telegram-test" => Remote.TelegramSetup.Test().GetAwaiter().GetResult(),
+                "telegram-off" => Remote.TelegramSetup.TurnOff(),
                 _ => Cli.Help(),
             };
         }
@@ -85,6 +88,9 @@ internal static class Cli
               FamilyTimeGuard.exe init-config --child NAME --account WINDOWS_USER [--force]
               FamilyTimeGuard.exe add-account --child NAME --account WINDOWS_USER
               FamilyTimeGuard.exe set-pin                        Reads a new parent PIN from the keyboard
+              FamilyTimeGuard.exe telegram-setup --pc-name "Chip's PC"   Connect the phone remote (stop the service first)
+              FamilyTimeGuard.exe telegram-test                  Send a test message to the parent's phone
+              FamilyTimeGuard.exe telegram-off                   Disconnect the phone remote
             """);
         return 0;
     }
@@ -174,7 +180,7 @@ internal static class Cli
         return 0;
     }
 
-    private static GuardConfig Load(bool validate = true)
+    internal static GuardConfig Load(bool validate = true)
     {
         if (!File.Exists(Paths.ConfigFile)) throw new FileNotFoundException($"No settings file at {Paths.ConfigFile}. Run init-config first.");
         var json = File.ReadAllText(Paths.ConfigFile);
@@ -183,7 +189,7 @@ internal static class Cli
             : System.Text.Json.JsonSerializer.Deserialize<GuardConfig>(json, GuardConfig.JsonOptions) ?? new GuardConfig();
     }
 
-    private static void Save(GuardConfig cfg)
+    internal static void Save(GuardConfig cfg)
     {
         Directory.CreateDirectory(Paths.DataDir);
         var tmp = Paths.ConfigFile + ".tmp";
@@ -191,7 +197,7 @@ internal static class Cli
         File.Move(tmp, Paths.ConfigFile, overwrite: true);
     }
 
-    private static string? Arg(string[] args, string name)
+    internal static string? Arg(string[] args, string name)
     {
         var i = Array.FindIndex(args, a => a.Equals(name, StringComparison.OrdinalIgnoreCase));
         return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;

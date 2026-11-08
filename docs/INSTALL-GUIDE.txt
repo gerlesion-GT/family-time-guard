@@ -34,6 +34,7 @@ STEP 2 - Install
        - Whose computer is this?  -> 1 for Boong, 2 for Chip
        - Which Windows account does the child use?  -> pick the number
        - Choose a parent PIN (4-12 digits). Keep it secret.
+       - Set up the phone remote now? -> Y if you have Telegram (see PHONE-GUIDE.txt)
   5. Wait for "All done!".
 
 
@@ -71,6 +72,7 @@ Start > "Family Time Guard" folder:
   - Edit settings (parents)        change bedtimes and daily minutes
   - Check status (parents)         see if the Guard is running and if settings are OK
   - Open activity logs (parents)   what was played/watched today, and when
+  - Set up phone remote (parents)  connect Telegram on your phone (see PHONE-GUIDE.txt)
 These ask for your parent password, so the kids can't use them.
 
 

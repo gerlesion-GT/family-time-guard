@@ -12,6 +12,9 @@ public sealed class UsageDay
     public int BonusGamesMinutes { get; set; }
     public int BonusYouTubeMinutes { get; set; }
 
+    /// <summary>"Ask for more time" requests sent today.</summary>
+    public int RequestsToday { get; set; }
+
     /// <summary>Warnings already shown today, so they are not repeated.</summary>
     public HashSet<string> Flags { get; set; } = [];
 }
@@ -20,6 +23,18 @@ public sealed class UsageDay
 public sealed class RuntimeState
 {
     public DateTimeOffset? PausedUntilUtc { get; set; }
+
+    /// <summary>Children locked by a parent from the phone, until the given time (UTC).</summary>
+    public Dictionary<string, DateTimeOffset> LockedUntilUtc { get; set; } = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Telegram: the last update already handled.</summary>
+    public long TelegramOffset { get; set; }
+
+    /// <summary>Telegram: last date (yyyy-MM-dd) the evening summary was sent.</summary>
+    public string? LastSummaryDate { get; set; }
+
+    public bool IsLocked(string child, DateTimeOffset nowUtc) =>
+        LockedUntilUtc.TryGetValue(child, out var until) && until > nowUtc;
 
     public bool IsPaused(DateTimeOffset nowUtc) => PausedUntilUtc is { } p && p > nowUtc;
 }

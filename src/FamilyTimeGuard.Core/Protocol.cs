@@ -22,11 +22,20 @@ public static class Protocol
 
 public sealed class AgentRequest
 {
-    /// <summary>"report" (every 2 seconds), "parent" (parent action) or "status" (diagnostics).</summary>
+    /// <summary>"report" (every 2 seconds), "parent" (parent action), "request-time" (ask parent) or "status" (diagnostics).</summary>
     public string Type { get; set; } = "report";
     public string? ForegroundTitle { get; set; }
     public string? ForegroundProcess { get; set; }
     public ParentCommand? Parent { get; set; }
+    public TimeRequest? Request { get; set; }
+}
+
+/// <summary>The child asks the parent for more time (sent to the parent's phone).</summary>
+public sealed class TimeRequest
+{
+    public string Kind { get; set; } = "games";   // games | youtube
+    public int Minutes { get; set; } = 15;
+    public string? Note { get; set; }
 }
 
 public sealed class ParentCommand
@@ -49,6 +58,10 @@ public sealed class AgentResponse
     /// <summary>When set, it is bedtime and the session will be logged off in this many seconds.</summary>
     public int? LogoffInSeconds { get; set; }
     public string? Message { get; set; }
+    /// <summary>Text for the full-screen lock message (bedtime or locked by a parent).</summary>
+    public string? LockMessage { get; set; }
+    /// <summary>True when the phone remote is set up, so the child can ask for more time.</summary>
+    public bool RemoteEnabled { get; set; }
     /// <summary>Diagnostics for the "status" command.</summary>
     public string? Diagnostics { get; set; }
 }

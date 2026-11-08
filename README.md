@@ -7,16 +7,18 @@ Simple screen-time rules for the kids' Windows computers (works on Windows Home)
 - **Homework is never blocked**: Office, school sites, Scratch and Roblox Studio don't count.
 - Friendly warnings before time runs out, plus ideas for what to do next.
 - **Parent options** on the child's PC, protected by a PIN: extra time, pause, resume.
+- **Phone remote (Telegram)**: status, extra time, change limits and bedtimes, lock, alerts,
+  "ask for more time" requests with Approve/Deny buttons, and an evening summary, from anywhere.
 
-👉 **Parents: see [docs/INSTALL-GUIDE.txt](docs/INSTALL-GUIDE.txt) and [docs/SETTINGS-GUIDE.txt](docs/SETTINGS-GUIDE.txt).**
+👉 **Parents: see [docs/INSTALL-GUIDE.txt](docs/INSTALL-GUIDE.txt), [docs/SETTINGS-GUIDE.txt](docs/SETTINGS-GUIDE.txt) and [docs/PHONE-GUIDE.txt](docs/PHONE-GUIDE.txt).**
 Download the latest `FamilyTimeGuard.zip` from the **Releases** page on the right.
 
 ## Roadmap
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Bedtime, game and YouTube budgets, warnings, parent PIN, activity log | ✅ this version |
-| 2 | Telegram remote: alerts, "ask for more time" button, daily summary, commands from your phone | planned |
+| 1 | Bedtime, game and YouTube budgets, warnings, parent PIN, activity log | ✅ done |
+| 2 | Telegram remote: alerts, "ask for more time" button, daily summary, commands from your phone | ✅ this version |
 | 3 | Chrome extension: per-tab YouTube tracking, website lists, no incognito, Restricted Mode | planned |
 | 4 | Earn game time with learning apps, weekly report | planned |
 
@@ -31,6 +33,11 @@ One program, `FamilyTimeGuard.exe` (.NET 10, self-contained), runs in two roles:
   so a standard user can't end it from Task Manager. It reports the foreground window title
   (how YouTube and web games are detected) and shows the status icon, warnings and bedtime countdown.
   It talks to the service over the named pipe `\\.\pipe\FamilyTimeGuard`.
+
+- **Phone remote** (`src/FamilyTimeGuard/Remote`): the service long-polls the parent's private Telegram bot
+  (outgoing HTTPS only; one bot per PC because a bot's updates can only be read by one poller). The bot key is
+  stored DPAPI-encrypted (machine scope) in `config.json`; only the paired Telegram user/chat is obeyed.
+  Command parsing and reports live in Core (`RemoteCommands.cs`, `Reports.cs`) and are unit-tested.
 
 Data lives in `C:\ProgramData\FamilyTimeGuard` (administrators and SYSTEM only):
 `config.json`, `state.json`, `usage\<child>\<date>.json`, `logs\activity-<date>.csv`, `logs\service.log`.

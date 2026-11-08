@@ -28,6 +28,12 @@ public sealed class GuardConfig
 
     public YouTubeRules YouTube { get; set; } = YouTubeRules.CreateDefault();
 
+    /// <summary>Phone remote through a private Telegram bot (one bot per computer).</summary>
+    public TelegramSettings Telegram { get; set; } = new();
+
+    /// <summary>Children whose Windows accounts are on this computer.</summary>
+    public List<ChildProfile> ChildrenOnThisPc() => Children.Where(c => c.WindowsAccounts.Count > 0).ToList();
+
     public ChildProfile? FindChildByAccount(string? windowsAccount)
     {
         if (string.IsNullOrWhiteSpace(windowsAccount)) return null;
@@ -72,6 +78,8 @@ public sealed class GuardConfig
     public List<string> Validate()
     {
         var errors = new List<string>();
+        if (!string.IsNullOrWhiteSpace(Telegram.DailySummaryAt) && !TimeParse.TryParse(Telegram.DailySummaryAt, out _))
+            errors.Add($"telegram.dailySummaryAt '{Telegram.DailySummaryAt}' must look like 21:30.");
         try { TimeZones.Find(TimeZone); }
         catch (Exception) { errors.Add($"Unknown timeZone '{TimeZone}'."); }
 
@@ -118,6 +126,34 @@ public sealed class GuardConfig
 }
 
 public sealed class ConfigException(string message) : Exception(message);
+
+public sealed class TelegramSettings
+{
+    /// <summary>The bot's secret key, encrypted for this computer. Set by the installer, never typed here.</summary>
+    public string? EncryptedBotToken { get; set; }
+
+    /// <summary>The bot's public name, e.g. "chip_pc_guard_bot" (for display only).</summary>
+    public string? BotUsername { get; set; }
+
+    /// <summary>The only Telegram user allowed to control this computer (the parent). Set by pairing.</summary>
+    public long? OwnerUserId { get; set; }
+
+    /// <summary>The private chat between the parent and the bot.</summary>
+    public long? OwnerChatId { get; set; }
+
+    /// <summary>Name used in messages, e.g. "Chip's PC".</summary>
+    public string PcName { get; set; } = "Kid's PC";
+
+    /// <summary>Local time for the evening summary. Empty = no summary.</summary>
+    public string DailySummaryAt { get; set; } = "21:30";
+
+    /// <summary>Optional proxy for reaching Telegram, e.g. "http://192.168.0.10:8080".</summary>
+    public string? Proxy { get; set; }
+
+    public bool Alerts { get; set; } = true;
+
+    public bool IsReady => !string.IsNullOrEmpty(EncryptedBotToken) && OwnerUserId is not null && OwnerChatId is not null;
+}
 
 public sealed class ChildProfile
 {

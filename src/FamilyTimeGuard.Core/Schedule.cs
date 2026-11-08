@@ -56,4 +56,14 @@ public static class Schedule
         var morning = local.TimeOfDay < NightBefore(cfg, child, today).Unlock ? today : today.AddDays(1);
         return morning.ToDateTime(TimeOnly.FromTimeSpan(NightBefore(cfg, child, morning).Unlock));
     }
+
+    /// <summary>The next morning unlock time after <paramref name="local"/> (used for "/lock" without a duration).</summary>
+    public static DateTime NextMorningUnlock(GuardConfig cfg, ChildProfile child, DateTime local)
+    {
+        var today = DateOnly.FromDateTime(local);
+        var todayUnlock = today.ToDateTime(TimeOnly.FromTimeSpan(NightBefore(cfg, child, today).Unlock));
+        if (local < todayUnlock) return todayUnlock;
+        var tomorrow = today.AddDays(1);
+        return tomorrow.ToDateTime(TimeOnly.FromTimeSpan(NightBefore(cfg, child, tomorrow).Unlock));
+    }
 }

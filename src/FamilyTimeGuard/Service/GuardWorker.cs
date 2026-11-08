@@ -1,5 +1,6 @@
 using System.Text;
 using FamilyTimeGuard.Core;
+using FamilyTimeGuard.Remote;
 using Microsoft.Extensions.Hosting;
 
 namespace FamilyTimeGuard.Service;
@@ -30,12 +31,15 @@ internal sealed class SessionState
     public string? LastYouTubeTitle;
     public bool WasPlayingGames;
 
+    public bool JustSignedIn = true;
+    public bool SignedInDuringBedtime;
+
     public DateTimeOffset? HelperMissingSince;
     public string? YouTubeBlockReason;
 }
 
 /// <summary>The background service: checks every 2 seconds and enforces the rules.</summary>
-internal sealed class GuardWorker : BackgroundService
+internal sealed partial class GuardWorker : BackgroundService
 {
     private static readonly TimeSpan TickInterval = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(12);
@@ -62,6 +66,8 @@ internal sealed class GuardWorker : BackgroundService
         BrowserPolicies.Apply();
 
         var pipeTask = new PipeServer(HandleRequest).RunAsync(ct);
+        _remote = new RemoteControl(this);
+        var remoteTask = _remote.RunAsync(ct);
 
         using var timer = new PeriodicTimer(TickInterval);
         try
@@ -81,6 +87,7 @@ internal sealed class GuardWorker : BackgroundService
             HostsFile.SetBlocked(false, []);
         }
         try { await pipeTask; } catch (OperationCanceledException) { }
+        try { await remoteTask; } catch (OperationCanceledException) { }
         Log.Info("Family Time Guard service stopped.");
     }
 
@@ -96,6 +103,7 @@ internal sealed class GuardWorker : BackgroundService
         var now = DateTimeOffset.UtcNow;
         var local = LocalNow;
         var paused = _state.State.IsPaused(now);
+        ExpireLocks(now);
 
         var childSessions = new List<(UserSession Session, ChildProfile Child)>();
         foreach (var s in Sessions.GetActiveUserSessions())
@@ -135,8 +143,19 @@ internal sealed class GuardWorker : BackgroundService
                 SessionLocked: session.Locked);
 
             var usage = _usage.Get(child.Name, DateOnly.FromDateTime(local));
-            var result = RuleEngine.Tick(cfg, child, usage, obs, local, elapsed, paused);
+            var parentLocked = _state.State.IsLocked(child.Name, now);
+            var result = RuleEngine.Tick(cfg, child, usage, obs, local, elapsed, paused, parentLocked);
             _usage.MarkDirty(usage);
+            if (st.JustSignedIn)
+            {
+                st.JustSignedIn = false;
+                st.SignedInDuringBedtime = result.Bedtime && !result.Paused;
+            }
+            foreach (var ev in result.Events)
+            {
+                if (ev == "games-used-up") Alert($"🎮 {child.Name}'s game time is used up for today.");
+                if (ev == "youtube-used-up") Alert($"📺 {child.Name}'s YouTube time is used up for today.");
+            }
             st.LastResult = result;
             st.PendingNotices.AddRange(result.Notices);
             st.PendingCloseTab |= result.CloseForegroundTab;
@@ -161,6 +180,7 @@ internal sealed class GuardWorker : BackgroundService
         }
 
         HostsFile.SetBlocked(blockYouTube, cfg.YouTube.BlockDomains);
+        CheckDailySummary(local);
 
         if (now - _lastFlush > TimeSpan.FromSeconds(30))
         {
@@ -193,7 +213,10 @@ internal sealed class GuardWorker : BackgroundService
             return;
         }
 
-        Log.Activity(local, st.Child, "bedtime-logoff", session.Locked ? "session was locked" : "");
+        Log.Activity(local, st.Child, result.ParentLocked ? "locked-logoff" : "bedtime-logoff", session.Locked ? "session was locked" : "");
+        if (result.ParentLocked) Alert($"🔒 {st.Child} was logged off (locked by you).");
+        else if (st.SignedInDuringBedtime) Alert($"🌙 {st.Child} signed in during bedtime ({local:HH:mm}) and was logged off.");
+        else Alert($"🌙 Bedtime: {st.Child} was logged off at {local:HH:mm}.");
         Log.Info($"Bedtime: logging off {session.UserName} (session {session.SessionId}).");
         if (!Sessions.LogOff(session.SessionId))
             Log.Error($"Log off failed: {Native.LastError("WTSLogoffSession").Message}");
@@ -214,7 +237,10 @@ internal sealed class GuardWorker : BackgroundService
             st.AgentPid = AgentLauncher.Launch(session.SessionId, protect);
             st.LaunchesWithoutHeartbeat++;
             if (st.LastHeartbeat != DateTimeOffset.MinValue)
+            {
                 Log.Activity(local, st.Child, "helper-restarted", "the tray helper was not running");
+                Alert($"⚠️ The clock helper on {_config.Current.Telegram.PcName} had stopped and was restarted ({st.Child}).");
+            }
             Log.Info($"Started tray helper in session {session.SessionId} (pid {st.AgentPid}, protected={protect}).");
         }
         catch (Exception ex)
@@ -250,6 +276,7 @@ internal sealed class GuardWorker : BackgroundService
             {
                 "report" => HandleReport(req, client),
                 "parent" => HandleParent(req, client),
+                "request-time" => HandleTimeRequest(req, client),
                 "status" => HandleStatus(),
                 _ => new AgentResponse { Ok = false, Error = "Unknown request" },
             };
@@ -275,6 +302,10 @@ internal sealed class GuardWorker : BackgroundService
             Notices = [.. st.PendingNotices],
             CloseForegroundTab = st.PendingCloseTab,
             LogoffInSeconds = st.LogoffInSeconds,
+            LockMessage = st.LastResult?.ParentLocked == true
+                ? $"A parent locked this computer{(_state.State.LockedUntilUtc.TryGetValue(st.Child, out var until) ? " until " + TimeZoneInfo.ConvertTimeFromUtc(until.UtcDateTime, Zone).ToString("ddd HH:mm") : "")}."
+                : null,
+            RemoteEnabled = _config.Current.Telegram.IsReady,
         };
         st.PendingNotices.Clear();
         st.PendingCloseTab = false;
@@ -300,6 +331,8 @@ internal sealed class GuardWorker : BackgroundService
         {
             _pinThrottle.RecordFailure(now);
             Log.Activity(local, st?.Child ?? "?", "parent-pin-wrong");
+            if (_pinThrottle.IsLocked(now, out _))
+                Alert($"⚠️ Someone entered a wrong parent PIN 5 times on {cfg.Telegram.PcName}. Parent options are blocked for 15 minutes.");
             return new AgentResponse { Ok = false, Error = "Wrong PIN." };
         }
         _pinThrottle.RecordSuccess();
@@ -334,6 +367,7 @@ internal sealed class GuardWorker : BackgroundService
         }
 
         Log.Activity(local, st?.Child ?? "-", "parent-action", message);
+        Alert($"ℹ️ Parent options were used on {cfg.Telegram.PcName} (with the PIN): {message}");
         Log.Info("Parent action: " + message);
         return new AgentResponse { Ok = true, Message = message };
     }

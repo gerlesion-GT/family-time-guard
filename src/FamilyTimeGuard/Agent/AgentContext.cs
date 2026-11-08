@@ -16,6 +16,7 @@ internal sealed class AgentContext : ApplicationContext
     private readonly Control _ui = new();
     private readonly ToastStack _toasts = new();
     private BedtimeForm? _bedtimeForm;
+    private readonly ToolStripMenuItem _askItem;
     private bool _busy;
     private AgentResponse? _last;
     private int _failures;
@@ -31,6 +32,8 @@ internal sealed class AgentContext : ApplicationContext
 
         var menu = new ContextMenuStrip();
         menu.Items.Add("My time today", null, (_, _) => ShowStatus());
+        _askItem = new ToolStripMenuItem("Ask for more time...", null, (_, _) => ShowAskForTime()) { Visible = false };
+        menu.Items.Add(_askItem);
         menu.Items.Add(new ToolStripSeparator());
         menu.Items.Add("Parent options...", null, (_, _) => ShowParentOptions());
 
@@ -83,6 +86,7 @@ internal sealed class AgentContext : ApplicationContext
             return;
         }
         _tray.Visible = true;
+        _askItem.Visible = r.RemoteEnabled;
 
         var s = r.Status;
         if (s is not null)
@@ -108,7 +112,7 @@ internal sealed class AgentContext : ApplicationContext
         {
             if (_bedtimeForm is null || _bedtimeForm.IsDisposed)
             {
-                _bedtimeForm = new BedtimeForm(r.ChildName ?? "", s?.UnlockAt);
+                _bedtimeForm = new BedtimeForm(r.ChildName ?? "", s?.UnlockAt, r.LockMessage);
                 _bedtimeForm.Show();
             }
             _bedtimeForm.UpdateCountdown(secs);
@@ -138,6 +142,12 @@ internal sealed class AgentContext : ApplicationContext
         sb.AppendLine();
         sb.AppendLine("Homework, school sites, Office, Scratch and Roblox Studio don't use up your time.");
         MessageBox.Show(sb.ToString(), "My time today", MessageBoxButtons.OK, MessageBoxIcon.Information);
+    }
+
+    private void ShowAskForTime()
+    {
+        using var form = new AskForTimeForm();
+        form.ShowDialog();
     }
 
     private void ShowParentOptions()
