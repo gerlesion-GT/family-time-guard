@@ -104,15 +104,35 @@ if ($Account) {
 # ---------------------------------------------------------------- stop old version (upgrade)
 Step "Installing program files"
 $existing = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
-if ($existing -and $existing.Status -ne 'Stopped') {
-    Stop-Service -Name $ServiceName -Force
-    Start-Sleep -Seconds 2
+$wasRunning = $existing -and $existing.Status -ne 'Stopped'
+if ($wasRunning) { Stop-Service -Name $ServiceName -Force }
+
+# The tray helpers in the children's sessions run from the same exe and keep running when the service stops.
+# Close them, then wait until Windows has really let go of the file (that can take several seconds).
+function Stop-GuardProcesses {
+    $procs = @(Get-Process -Name 'FamilyTimeGuard' -ErrorAction SilentlyContinue)
+    $procs | Stop-Process -Force -ErrorAction SilentlyContinue
+    $procs | Wait-Process -Timeout 20 -ErrorAction SilentlyContinue
 }
-Get-Process -Name 'FamilyTimeGuard' -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
-Start-Sleep -Seconds 1
+Stop-GuardProcesses
 
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-Copy-Item -Path $SourceExe -Destination $Exe -Force
+$copied = $false
+for ($try = 1; $try -le 15 -and -not $copied; $try++) {
+    try {
+        Copy-Item -Path $SourceExe -Destination $Exe -Force -ErrorAction Stop
+        $copied = $true
+    } catch {
+        if ($try -eq 1) { Say "  The old program is still closing, waiting a moment..." }
+        Stop-GuardProcesses
+        Start-Sleep -Seconds 2
+    }
+}
+if (-not $copied) {
+    # Never leave the children unprotected: start the old version again before giving up.
+    if ($wasRunning) { Start-Service -Name $ServiceName -ErrorAction SilentlyContinue }
+    Fail "Could not replace $Exe because it is still in use. The previous version is running again. Restart the computer and run the installer again."
+}
 Unblock-File -Path $Exe -ErrorAction SilentlyContinue
 foreach ($doc in 'INSTALL-GUIDE.txt', 'SETTINGS-GUIDE.txt', 'Status.cmd', 'Logs.cmd') {
     $p = Join-Path $PSScriptRoot $doc

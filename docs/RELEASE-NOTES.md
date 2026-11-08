@@ -2,6 +2,11 @@
 
 **Download `FamilyTimeGuard.zip`, extract it, and follow `INSTALL-GUIDE.txt`.**
 
+What's new:
+- YouTube is no longer blocked for a parent while a child's account is only signed in in the background ("Switch user").
+- Upgrading no longer fails when a child is signed in: the installer waits for the old tray helper to close, and if it
+  still can't replace the program it starts the previous version again instead of leaving the computer unprotected.
+
 What it does:
 - Bedtime lock: warnings 15/5/1 minutes before, then the computer logs off. Signing in again at night logs off again.
 - Daily game time (Roblox, Minecraft, Steam/Epic/Xbox games, web game sites). Games close when time is up.

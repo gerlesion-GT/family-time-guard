@@ -96,9 +96,19 @@ jobs:
           & $exe check-config
           if ($LASTEXITCODE -ne 0) { throw 'check-config failed' }
 
-          # Upgrade in place keeps settings
+          # Upgrade in place keeps settings. Keep the old exe locked for a few seconds, like a tray helper
+          # that is still closing in a child's session: the installer must wait for it instead of failing.
+          $lock = Start-Job -ArgumentList $exe -ScriptBlock {
+            param($p)
+            $fs = [System.IO.File]::Open($p, 'Open', 'Read', 'Read')
+            Start-Sleep -Seconds 8
+            $fs.Dispose()
+          }
+          Start-Sleep -Seconds 3
           & .\package\Install.ps1 -NonInteractive
           if ($LASTEXITCODE -ne 0) { throw "Upgrade failed ($LASTEXITCODE)" }
+          Receive-Job $lock -Wait -AutoRemoveJob
+          if ((Get-Service FamilyTimeGuard).Status -ne 'Running') { throw 'Service is not running after upgrade' }
           $cfg = Get-Content (Join-Path $env:ProgramData 'FamilyTimeGuard\config.json') -Raw | ConvertFrom-Json
           $chip = $cfg.children | Where-Object { $_.name -eq 'Chip' }
           if (-not ($chip.windowsAccounts -contains 'ftgkid')) { throw 'Settings lost on upgrade' }
