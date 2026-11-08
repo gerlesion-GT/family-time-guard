@@ -87,8 +87,12 @@ jobs:
           } catch { "FAIL $env:USERNAME $($_.Exception.Message)" | Set-Content C:\Users\Public\ftg-pipe-test.txt }
           '@
           $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-          $cred = New-Object System.Management.Automation.PSCredential('ftgkid', $pw)
-          Start-Process powershell.exe -Credential $cred -ArgumentList "-NoProfile -EncodedCommand $enc" -Wait -WorkingDirectory C:\Users\Public
+          # Run it as the child account through Task Scheduler (works without an interactive sign-in).
+          $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -EncodedCommand $enc" -WorkingDirectory 'C:\Users\Public'
+          Register-ScheduledTask -TaskName 'FtgPipeTest' -Action $action -User 'ftgkid' -Password 'Test-Passw0rd!x9' -RunLevel Limited | Out-Null
+          Start-ScheduledTask -TaskName 'FtgPipeTest'
+          for ($i = 0; $i -lt 60 -and -not (Test-Path $out); $i++) { Start-Sleep -Seconds 1 }
+          Unregister-ScheduledTask -TaskName 'FtgPipeTest' -Confirm:$false
           $result = Get-Content $out -Raw
           Write-Host "Child-account pipe test: $result"
           if ($result -notlike 'OK ftgkid*') { throw 'A standard (child) account cannot talk to the Guard' }
