@@ -58,6 +58,7 @@ internal sealed class AgentContext : ApplicationContext
             var fg = ForegroundWindow.Get();
             var request = new AgentRequest { Type = "report", ForegroundTitle = fg.Title, ForegroundProcess = fg.ProcessName };
             var response = await Task.Run(() => PipeClientCall.Send(request));
+            if (_last is null || _failures >= 3) AgentLog.Write($"Connected to the Guard (rules active: {response.Enforced}).");
             _failures = 0;
             Apply(response, fg);
         }

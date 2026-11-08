@@ -29,6 +29,9 @@ internal sealed class SessionState
 
     public string? LastYouTubeTitle;
     public bool WasPlayingGames;
+
+    public DateTimeOffset? HelperMissingSince;
+    public string? YouTubeBlockReason;
 }
 
 /// <summary>The background service: checks every 2 seconds and enforces the rules.</summary>
@@ -38,6 +41,8 @@ internal sealed class GuardWorker : BackgroundService
     private static readonly TimeSpan HeartbeatTimeout = TimeSpan.FromSeconds(12);
     private static readonly TimeSpan RelaunchDelay = TimeSpan.FromSeconds(20);
     private static readonly TimeSpan BedtimeGrace = TimeSpan.FromSeconds(60);
+    /// <summary>How long the tray helper may be missing before YouTube is blocked as a precaution.</summary>
+    private static readonly TimeSpan HelperMissingGrace = TimeSpan.FromMinutes(2);
 
     private readonly object _sync = new();
     private readonly ConfigWatcher _config = new();
@@ -117,12 +122,16 @@ internal sealed class GuardWorker : BackgroundService
             st.LastTick = now;
 
             var agentConnected = now - st.LastHeartbeat < HeartbeatTimeout;
+            if (agentConnected) st.HelperMissingSince = null;
+            else st.HelperMissingSince ??= now;
+            // Give the helper time to start (e.g. right after sign-in) before treating it as missing.
+            var helperOk = agentConnected || now - st.HelperMissingSince!.Value < HelperMissingGrace;
             var running = games[session.SessionId];
             var obs = new Observation(
                 GameProcessRunning: running.Count > 0,
                 ForegroundTitle: agentConnected ? st.ForegroundTitle : null,
                 ForegroundProcess: agentConnected ? st.ForegroundProcess : null,
-                AgentConnected: agentConnected,
+                AgentConnected: helperOk,
                 SessionLocked: session.Locked);
 
             var usage = _usage.Get(child.Name, DateOnly.FromDateTime(local));
@@ -131,7 +140,12 @@ internal sealed class GuardWorker : BackgroundService
             st.LastResult = result;
             st.PendingNotices.AddRange(result.Notices);
             st.PendingCloseTab |= result.CloseForegroundTab;
-            blockYouTube |= result.BlockYouTube;
+            st.YouTubeBlockReason = !result.BlockYouTube ? null
+                : !helperOk ? "the tray helper is not running"
+                : "YouTube time is used up for today";
+            // The block is computer-wide (hosts file), so only apply it while the child is the one using the screen.
+            // Otherwise a parent who uses "Switch user" would also lose YouTube.
+            if (session.OnScreen) blockYouTube |= result.BlockYouTube;
 
             LogActivityChanges(st, result, running, local);
 
@@ -339,8 +353,10 @@ internal sealed class GuardWorker : BackgroundService
             var r = st.LastResult;
             sb.AppendLine($"Session {st.SessionId}: {st.Child} ({st.UserName}), helper {(DateTimeOffset.UtcNow - st.LastHeartbeat < HeartbeatTimeout ? "connected" : "NOT connected")}" +
                           (r is null ? "" : $", games left {Fmt(r.GamesLeftSeconds)}, YouTube left {Fmt(r.YouTubeLeftSeconds)}, bedtime {(r.Bedtime ? "NOW" : r.NextBedtimeLocal?.ToString("HH:mm"))}"));
+            if (st.YouTubeBlockReason is not null) sb.AppendLine($"  YouTube is blocked for {st.Child} because {st.YouTubeBlockReason}.");
         }
         if (_sessions.Count == 0) sb.AppendLine("No child is logged in right now.");
+        sb.AppendLine($"YouTube block on this computer: {(HostsFile.IsBlocked ? "ON" : "off")}");
         return new AgentResponse { Ok = true, Diagnostics = sb.ToString() };
 
         static string Fmt(int s) => s < 0 ? "unlimited" : $"{s / 60} min";

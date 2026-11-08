@@ -73,6 +73,26 @@ jobs:
           $report = Send-Guard '{"type":"report","foregroundTitle":"x","foregroundProcess":"y.exe"}'
           if ($report.enforced) { throw 'Runner session should not be enforced' }
 
+          # The tray helper runs as the (non-admin) child: check such an account can talk to the Guard.
+          $out = 'C:\Users\Public\ftg-pipe-test.txt'
+          Remove-Item $out -ErrorAction SilentlyContinue
+          $script = @'
+          try {
+            $c = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'FamilyTimeGuard', 'InOut')
+            $c.Connect(5000)
+            $w = New-Object System.IO.StreamWriter($c); $w.AutoFlush = $true
+            $r = New-Object System.IO.StreamReader($c)
+            $w.WriteLine('{"type":"report","foregroundTitle":"x","foregroundProcess":"y.exe"}')
+            "OK $env:USERNAME " + $r.ReadLine() | Set-Content C:\Users\Public\ftg-pipe-test.txt
+          } catch { "FAIL $env:USERNAME $($_.Exception.Message)" | Set-Content C:\Users\Public\ftg-pipe-test.txt }
+          '@
+          $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+          $cred = New-Object System.Management.Automation.PSCredential('ftgkid', $pw)
+          Start-Process powershell.exe -Credential $cred -ArgumentList "-NoProfile -EncodedCommand $enc" -Wait -WorkingDirectory C:\Users\Public
+          $result = Get-Content $out -Raw
+          Write-Host "Child-account pipe test: $result"
+          if ($result -notlike 'OK ftgkid*') { throw 'A standard (child) account cannot talk to the Guard' }
+
           $exe = Join-Path $env:ProgramFiles 'FamilyTimeGuard\FamilyTimeGuard.exe'
           & $exe check-config
           if ($LASTEXITCODE -ne 0) { throw 'check-config failed' }

@@ -60,6 +60,7 @@ internal static class Program
         using var mutex = new Mutex(true, @"Local\FamilyTimeGuard.Agent", out var isFirst);
         if (!isFirst) return 0;
 
+        AgentLog.Write($"Helper started for {Environment.UserName}.");
         Application.ThreadException += (_, e) => AgentLog.Write("UI error: " + e.Exception);
         AppDomain.CurrentDomain.UnhandledException += (_, e) => AgentLog.Write("Crash: " + e.ExceptionObject);
         Application.SetUnhandledExceptionMode(UnhandledExceptionMode.CatchException);

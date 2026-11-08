@@ -128,7 +128,8 @@ internal sealed class StateStore
 }
 
 /// <summary>A logged-in Windows session.</summary>
-internal sealed record UserSession(int SessionId, string UserName, bool Locked);
+/// <summary>A logged-in Windows session. OnScreen = the session currently using the screen (not switched away).</summary>
+internal sealed record UserSession(int SessionId, string UserName, bool Locked, bool OnScreen);
 
 internal static class Sessions
 {
@@ -149,7 +150,7 @@ internal static class Sessions
                 var user = QueryString(info.SessionId, Native.WTS_INFO_CLASS.WTSUserName);
                 if (string.IsNullOrEmpty(user)) continue;
                 var locked = info.State == Native.WTS_CONNECTSTATE_CLASS.Disconnected || IsLocked(info.SessionId);
-                result.Add(new UserSession(info.SessionId, user, locked));
+                result.Add(new UserSession(info.SessionId, user, locked, info.State == Native.WTS_CONNECTSTATE_CLASS.Active));
             }
         }
         finally { Native.WTSFreeMemory(buffer); }
@@ -233,6 +234,8 @@ internal static class HostsFile
     private static string FilePath => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System), @"drivers\etc\hosts");
 
     private static bool? _lastBlocked;
+
+    public static bool IsBlocked => _lastBlocked == true;
     private static string _lastDomains = "";
 
     public static void SetBlocked(bool blocked, IReadOnlyList<string> domains)
