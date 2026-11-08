@@ -75,7 +75,7 @@ internal sealed class TelegramApi : IDisposable
             handler.Proxy = new WebProxy(proxy);
             handler.UseProxy = true;
         }
-        _http = new HttpClient(handler) { BaseAddress = new Uri("https://api.telegram.org/"), Timeout = TimeSpan.FromSeconds(75) };
+        _http = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(75) };
     }
 
     public static bool LooksLikeToken(string? t) =>
@@ -118,11 +118,18 @@ internal sealed class TelegramApi : IDisposable
         HttpResponseMessage response;
         try
         {
-            response = await _http.PostAsJsonAsync($"bot{_token}/{method}", payload, Json, ct);
+            // Always a full address: the key contains ':' and must never be read as part of the address itself.
+            var url = new Uri("https://api.telegram.org/bot" + Uri.EscapeDataString(_token).Replace("%3A", ":") + "/" + method, UriKind.Absolute);
+            response = await _http.PostAsJsonAsync(url, payload, Json, ct);
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
         {
             throw new TelegramException("Cannot reach Telegram: " + Scrub(ex.Message));
+        }
+        catch (Exception ex)
+        {
+            throw new TelegramException("Telegram request failed: " + Scrub(ex.Message));
         }
 
         using (response)
@@ -146,7 +153,12 @@ internal sealed class TelegramApi : IDisposable
         }
     }
 
-    private string Scrub(string s) => s.Replace(_token, "***", StringComparison.Ordinal);
+    private string Scrub(string s)
+    {
+        s = s.Replace(_token, "***", StringComparison.Ordinal);
+        var secretPart = _token.Contains(':') ? _token[(_token.IndexOf(':') + 1)..] : _token;
+        return secretPart.Length > 8 ? s.Replace(secretPart, "***", StringComparison.Ordinal) : s;
+    }
 
     public void Dispose() => _http.Dispose();
 }

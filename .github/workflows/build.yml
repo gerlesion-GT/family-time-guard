@@ -98,8 +98,10 @@ jobs:
 
           # Phone remote: a fake bot key must be refused by Telegram, and never appear in any output.
           $env:FTG_TELEGRAM_TOKEN = '123456789:AAFakeFakeFakeFakeFakeFakeFakeFake12'
+          $ErrorActionPreference = 'Continue'
           $tgOut = (& $exe telegram-setup --pc-name 'Test PC' 2>&1 | Out-String)
           $tgCode = $LASTEXITCODE
+          $ErrorActionPreference = 'Stop'
           Remove-Item Env:\FTG_TELEGRAM_TOKEN
           Write-Host "telegram-setup with a fake key (exit $tgCode): $tgOut"
           if ($tgCode -ne 5) { throw "Expected exit code 5 for a rejected bot key, got $tgCode" }
