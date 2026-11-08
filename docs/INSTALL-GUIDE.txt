@@ -51,6 +51,8 @@ STEP 3 - Check that it works (5 minutes)
   5. In the dashboard click "Unlock parent controls" and type your PIN. The +15 / +30 / +60
      buttons next to each line, "Pause 1 hour" and "Resume rules" now work for 5 minutes.
      Try +15 on Games to see that it works.
+     "Change daily limits..." lets you set the minutes per day (screen time, games, YouTube)
+     and the bedtimes for school days and weekends, right there on the computer.
 
 Bedtime test (optional): temporarily set the child's bedtime ("lockAt") to a few
 minutes from now in the settings (see SETTINGS-GUIDE.txt). Watch for the warning,

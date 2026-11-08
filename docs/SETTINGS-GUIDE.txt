@@ -1,7 +1,10 @@
 FAMILY TIME GUARD - CHANGING THE RULES
 ======================================
 
-Open: Start > Family Time Guard > "Edit settings (parents)".
+Easiest: on the child's computer, click the clock icon > "Unlock parent controls" (PIN) >
+"Change daily limits...". Or from your phone with /set and /bedtime (see PHONE-GUIDE.txt).
+
+Advanced: Start > Family Time Guard > "Edit settings (parents)".
 Notepad opens the settings file. Change the numbers, then File > Save.
 The Guard picks up the change within about 10 seconds - no restart needed.
 

@@ -18,6 +18,8 @@ internal sealed class DashboardForm : Form
     private readonly Button _pause = new() { AutoSize = true, Text = "Pause 1 hour", Enabled = false, Padding = new Padding(8, 4, 8, 4) };
     private readonly Button _resume = new() { AutoSize = true, Text = "Resume rules", Enabled = false, Padding = new Padding(8, 4, 8, 4) };
     private readonly Button _ask = new() { AutoSize = true, Text = "Ask for more time", Visible = false, Padding = new Padding(8, 4, 8, 4) };
+    private readonly Button _limits = new() { AutoSize = true, Text = "Change daily limits...", Enabled = false, Padding = new Padding(8, 4, 8, 4) };
+    private string _childName = "";
     private readonly System.Windows.Forms.Timer _relock = new();
     private readonly List<Button> _parentButtons = [];
     private readonly Row _screen, _games, _youtube;
@@ -52,7 +54,7 @@ internal sealed class DashboardForm : Form
         root.Controls.Add(_youtube.Panel);
 
         var bottom = new FlowLayoutPanel { AutoSize = true, Margin = new Padding(0, 14, 0, 0), WrapContents = false };
-        bottom.Controls.AddRange([_unlock, _pause, _resume, _ask]);
+        bottom.Controls.AddRange([_unlock, _limits, _pause, _resume, _ask]);
         root.Controls.Add(bottom);
         root.Controls.Add(_message);
         Controls.Add(root);
@@ -61,7 +63,8 @@ internal sealed class DashboardForm : Form
         _pause.Click += async (_, _) => await DoParentAction("pause", 60, _pause);
         _resume.Click += async (_, _) => await DoParentAction("resume", 0, _resume);
         _ask.Click += (_, _) => { using var f = new AskForTimeForm(); f.ShowDialog(this); };
-        _parentButtons.AddRange([_pause, _resume]);
+        _limits.Click += async (_, _) => await OpenLimits();
+        _parentButtons.AddRange([_pause, _resume, _limits]);
 
         _relock.Interval = 1000;
         _relock.Tick += (_, _) =>
@@ -85,6 +88,7 @@ internal sealed class DashboardForm : Form
         if (IsDisposed) return;
         var s = r?.Status;
         _title.Text = string.IsNullOrEmpty(r?.ChildName) ? "My time today" : $"Hi {r.ChildName}! Here's your time today";
+        _childName = r?.ChildName ?? "";
         _ask.Visible = r?.RemoteEnabled == true;
         if (s is null)
         {
@@ -137,6 +141,19 @@ internal sealed class DashboardForm : Form
         ShowMessage(r.Ok ? r.Message ?? "Done." : r.Error ?? "Something went wrong.", r.Ok);
         if (!r.Ok && r.Error?.Contains("PIN", StringComparison.OrdinalIgnoreCase) == true) Lock(r.Error);
         else _unlockedUntil = DateTime.UtcNow + UnlockFor; // stay unlocked while being used
+    }
+
+    private async Task OpenLimits()
+    {
+        if (_pin is null) { ToggleUnlock(); if (_pin is null) return; }
+        _limits.Enabled = false;
+        var r = await ParentActions.Send("get-rules", 0, _pin!);
+        _limits.Enabled = _pin is not null;
+        if (!r.Ok || r.Rules is null) { ShowMessage(r.Error ?? "Could not read the current limits.", false); return; }
+        using var form = new RulesForm(_childName, r.Rules, _pin!);
+        form.ShowDialog(this);
+        _unlockedUntil = DateTime.UtcNow + UnlockFor;
+        if (form.Saved) ShowMessage("Daily limits saved.", ok: true);
     }
 
     private void ShowMessage(string text, bool ok)

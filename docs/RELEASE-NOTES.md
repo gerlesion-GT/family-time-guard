@@ -20,6 +20,7 @@ New: total screen time (optional, off by default)
 New dashboard on the child's computer (click the clock icon):
 - Screen time (total), games and YouTube at a glance: time left, time used, the daily limit and any extra time.
 - Parent buttons behind the PIN: +15 / +30 / +60 for each, Pause 1 hour, Resume. They lock again after 5 minutes.
+- "Change daily limits...": set minutes per day (screen time, games, YouTube) and bedtimes for school days and weekends.
 
 Installer: the phone remote is now clearly optional – set up now, skip for now, or skip and don't ask again.
 

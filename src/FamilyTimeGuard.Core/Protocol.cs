@@ -43,9 +43,11 @@ public sealed class TimeRequest
 public sealed class ParentCommand
 {
     public string Pin { get; set; } = "";
-    /// <summary>"verify", "bonus-games", "bonus-youtube", "pause", "resume".</summary>
+    /// <summary>"verify", "bonus-games", "bonus-youtube", "bonus-screen", "pause", "resume", "get-rules", "set-rules".</summary>
     public string Action { get; set; } = "verify";
     public int Minutes { get; set; }
+    /// <summary>New daily limits and bedtimes (for "set-rules").</summary>
+    public RulesDto? Rules { get; set; }
 }
 
 public sealed class AgentResponse
@@ -65,6 +67,8 @@ public sealed class AgentResponse
     public string? LockMessage { get; set; }
     /// <summary>True when the phone remote is set up, so the child can ask for more time.</summary>
     public bool RemoteEnabled { get; set; }
+    /// <summary>Current daily limits and bedtimes (answer to "get-rules").</summary>
+    public RulesDto? Rules { get; set; }
     /// <summary>Diagnostics for the "status" command.</summary>
     public string? Diagnostics { get; set; }
 }

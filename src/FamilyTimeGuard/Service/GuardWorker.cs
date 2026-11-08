@@ -361,6 +361,20 @@ internal sealed partial class GuardWorker : BackgroundService
         {
             case "verify":
                 return new AgentResponse { Ok = true, Message = "PIN accepted." };
+            case "get-rules":
+                if (st is null || cfg.FindChildByName(st.Child) is not { } who) return new AgentResponse { Ok = false, Error = "This account has no rules." };
+                return new AgentResponse { Ok = true, Rules = RulesDto.From(who) };
+            case "set-rules":
+                if (st is null || cmd.Rules is null) return new AgentResponse { Ok = false, Error = "Nothing to change." };
+                List<string> changes = [];
+                try
+                {
+                    EditConfig(c => { changes = cmd.Rules.ApplyTo(c.FindChildByName(st.Child)!); return "rules changed"; }, local, st.Child, logIt: false);
+                }
+                catch (ConfigException ex) { return new AgentResponse { Ok = false, Error = ex.Message }; }
+                if (changes.Count == 0) return new AgentResponse { Ok = true, Message = "No changes." };
+                message = $"{st.Child}'s rules changed: " + string.Join("; ", changes) + ".";
+                break;
             case "bonus-games" or "bonus-youtube" or "bonus-screen":
                 if (st is null) return new AgentResponse { Ok = false, Error = "This account has no rules, so extra time is not needed." };
                 var usage = _usage.Get(st.Child, DateOnly.FromDateTime(local));

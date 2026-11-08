@@ -44,6 +44,11 @@ internal static class UiPreview
             Save(lockForm, Path.Combine(folder, "lock-screen.png"));
             lockForm.ForceClose();
         }
+        var rules = RulesDto.From(GuardConfig.CreateDefault().FindChildByName("Chip")!);
+        rules.SchoolScreen = 180;
+        using (var rulesForm = new RulesForm("Chip", rules, "0000") { StartPosition = FormStartPosition.Manual, Location = new Point(-4000, -4000) })
+            Save(rulesForm, Path.Combine(folder, "rules-form.png"));
+
         Console.WriteLine("Saved previews to " + Path.GetFullPath(folder));
         return 0;
     }

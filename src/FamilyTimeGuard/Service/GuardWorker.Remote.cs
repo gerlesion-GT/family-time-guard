@@ -283,7 +283,7 @@ internal sealed partial class GuardWorker
         return "Sorry, I didn't understand. Send /help.";
     }
 
-    private string EditConfig(Func<GuardConfig, string> change, DateTime local, string child)
+    private string EditConfig(Func<GuardConfig, string> change, DateTime local, string child, bool logIt = true)
     {
         var cfg = GuardConfig.Parse(File.ReadAllText(Paths.ConfigFile));
         var message = change(cfg);
@@ -293,7 +293,7 @@ internal sealed partial class GuardWorker
         File.WriteAllText(tmp, cfg.ToJson());
         File.Move(tmp, Paths.ConfigFile, overwrite: true);
         _config.Refresh(force: true);
-        Log.Activity(local, child, "parent-action", "phone: " + message);
+        if (logIt) Log.Activity(local, child, "parent-action", "phone: " + message);
         return "✅ " + message;
     }
 

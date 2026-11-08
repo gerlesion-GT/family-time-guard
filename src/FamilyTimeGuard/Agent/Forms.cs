@@ -235,14 +235,14 @@ internal sealed class PinForm : Form
 
 internal static class ParentActions
 {
-    public static async Task<AgentResponse> Send(string action, int minutes, string pin)
+    public static async Task<AgentResponse> Send(string action, int minutes, string pin, RulesDto? rules = null)
     {
         try
         {
             return await Task.Run(() => PipeClientCall.Send(new AgentRequest
             {
                 Type = "parent",
-                Parent = new ParentCommand { Action = action, Minutes = minutes, Pin = pin },
+                Parent = new ParentCommand { Action = action, Minutes = minutes, Pin = pin, Rules = rules },
             }, 4000));
         }
         catch (Exception ex)
