@@ -31,7 +31,13 @@ jobs:
 
       - name: Draw UI previews (dashboard and lock screen)
         shell: pwsh
-        run: ./publish/FamilyTimeGuard.exe render-ui ui-previews
+        run: |
+          ./publish/FamilyTimeGuard.exe render-ui ui-previews
+          # Also print the pictures into the log (base64), for reviewers who can't download artifacts.
+          Get-ChildItem ui-previews/*.png | ForEach-Object {
+            $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($_.FullName))
+            for ($i = 0; $i -lt $b64.Length; $i += 8000) { Write-Host "PREVIEW|$($_.Name)|$($b64.Substring($i, [Math]::Min(8000, $b64.Length - $i)))" }
+          }
         continue-on-error: true
 
       - uses: actions/upload-artifact@v5
