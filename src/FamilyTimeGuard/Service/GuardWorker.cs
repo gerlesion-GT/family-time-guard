@@ -305,7 +305,7 @@ internal sealed partial class GuardWorker : BackgroundService
         {
             Enforced = true,
             ChildName = st.Child,
-            Status = ToStatus(st.LastResult),
+            Status = ToStatus(st.LastResult, _usage.Get(st.Child, DateOnly.FromDateTime(LocalNow))),
             Notices = [.. st.PendingNotices],
             CloseForegroundTab = st.PendingCloseTab,
             LogoffInSeconds = st.LogoffInSeconds,
@@ -414,7 +414,7 @@ internal sealed partial class GuardWorker : BackgroundService
         static string Fmt(int s) => s < 0 ? "unlimited" : $"{s / 60} min";
     }
 
-    private StatusInfo? ToStatus(TickResult? r)
+    private StatusInfo? ToStatus(TickResult? r, UsageDay usage)
     {
         if (r is null) return null;
         return new StatusInfo
@@ -434,6 +434,14 @@ internal sealed partial class GuardWorker : BackgroundService
             ScreenLeftSeconds = r.ScreenLeftSeconds,
             ScreenBudgetSeconds = r.ScreenBudgetSeconds,
             ScreenTimeUp = r.ScreenTimeUp,
+            CountingScreen = r.CountingScreen,
+            GamesUsedSeconds = (int)usage.GamesSeconds,
+            YouTubeUsedSeconds = (int)usage.YouTubeSeconds,
+            ScreenUsedSeconds = (int)usage.ScreenSeconds,
+            BonusGamesMinutes = usage.BonusGamesMinutes,
+            BonusYouTubeMinutes = usage.BonusYouTubeMinutes,
+            BonusScreenMinutes = usage.BonusScreenMinutes,
+            ParentLocked = r.ParentLocked,
         };
     }
 

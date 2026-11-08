@@ -17,6 +17,10 @@ New: total screen time (optional, off by default)
   "Shut down" button (and "Ask for more time" if the phone remote is set up), and sign-out after 60 seconds.
 - Time away from the keyboard (5+ minutes idle, no game or video) is not counted. `/bonus screen 30` gives extra time.
 
+New dashboard on the child's computer (click the clock icon):
+- Screen time (total), games and YouTube at a glance: time left, time used, the daily limit and any extra time.
+- Parent buttons behind the PIN: +15 / +30 / +60 for each, Pause 1 hour, Resume. They lock again after 5 minutes.
+
 Installer: the phone remote is now clearly optional – set up now, skip for now, or skip and don't ask again.
 
 Also fixed:

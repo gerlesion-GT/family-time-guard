@@ -44,11 +44,13 @@ STEP 3 - Check that it works (5 minutes)
   1. Sign in as the child.
   2. Within a few seconds a small round clock icon appears near the time (bottom-right).
      If you don't see it, click the little "^" arrow next to the clock.
-  3. Click the icon: it shows game time, YouTube time and bedtime for today.
+  3. Click the icon: the dashboard shows screen time, game time and YouTube time for today
+     (time left, time used, and the limit), plus bedtime.
   4. Open YouTube in Chrome for a minute, then click the icon again:
      the YouTube time left should go down.
-  5. Right-click the icon > "Parent options..." > type your PIN.
-     Try "+15 min" for games to see that it works.
+  5. In the dashboard click "Unlock parent controls" and type your PIN. The +15 / +30 / +60
+     buttons next to each line, "Pause 1 hour" and "Resume rules" now work for 5 minutes.
+     Try +15 on Games to see that it works.
 
 Bedtime test (optional): temporarily set the child's bedtime ("lockAt") to a few
 minutes from now in the settings (see SETTINGS-GUIDE.txt). Watch for the warning,

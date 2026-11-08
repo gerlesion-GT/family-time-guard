@@ -80,6 +80,7 @@ internal sealed class AgentContext : ApplicationContext
     private void Apply(AgentResponse r, ForegroundInfo fg)
     {
         _last = r;
+        if (_dashboard is { IsDisposed: false }) _dashboard.UpdateFrom(r);
         if (!r.Enforced)
         {
             _tray.Visible = false;
@@ -126,27 +127,27 @@ internal sealed class AgentContext : ApplicationContext
         }
     }
 
-    private void ShowStatus()
+    private DashboardForm? _dashboard;
+
+    /// <summary>Opens the dashboard (or brings it to the front).</summary>
+    private DashboardForm ShowDashboard()
     {
-        var r = _last;
-        if (r?.Status is not { } s)
+        if (_dashboard is null || _dashboard.IsDisposed)
         {
-            MessageBox.Show("Family Time Guard is starting. Please try again in a few seconds.", "Family Time Guard");
-            return;
+            _dashboard = new DashboardForm();
+            _dashboard.UpdateFrom(_last);
+            _dashboard.Show();
         }
-        var sb = new StringBuilder();
-        sb.AppendLine($"Hi {r.ChildName}!");
-        sb.AppendLine();
-        if (s.Paused) sb.AppendLine($"A parent paused the rules{(s.PausedUntil is null ? "" : " until " + s.PausedUntil)}.\n");
-        sb.AppendLine($"Game time left today:     {Fmt(s.GamesLeftSeconds)}{Of(s.GamesBudgetSeconds)}");
-        sb.AppendLine($"YouTube time left today:  {Fmt(s.YouTubeLeftSeconds)}{Of(s.YouTubeBudgetSeconds)}");
-        if (s.ScreenLeftSeconds >= 0)
-            sb.AppendLine($"Screen time left today:   {Fmt(s.ScreenLeftSeconds)}{Of(s.ScreenBudgetSeconds)}");
-        sb.AppendLine(s.Bedtime ? $"It's bedtime. The computer unlocks at {s.UnlockAt}." : $"Bedtime tonight:          {s.NextBedtime}");
-        sb.AppendLine();
-        sb.AppendLine("Homework, school sites, Office, Scratch and Roblox Studio don't use up your time.");
-        MessageBox.Show(sb.ToString(), "My time today", MessageBoxButtons.OK, MessageBoxIcon.Information);
+        else
+        {
+            if (_dashboard.WindowState == FormWindowState.Minimized) _dashboard.WindowState = FormWindowState.Normal;
+            _dashboard.UpdateFrom(_last);
+        }
+        _dashboard.Activate();
+        return _dashboard;
     }
+
+    private void ShowStatus() => ShowDashboard();
 
     private void ShowAskForTime()
     {
@@ -154,13 +155,7 @@ internal sealed class AgentContext : ApplicationContext
         form.ShowDialog();
     }
 
-    private void ShowParentOptions()
-    {
-        using var pinForm = new PinForm();
-        if (pinForm.ShowDialog() != DialogResult.OK) return;
-        using var parentForm = new ParentForm(pinForm.Pin, _last?.ChildName ?? "");
-        parentForm.ShowDialog();
-    }
+    private void ShowParentOptions() => ShowDashboard().PromptUnlock();
 
     private static string Fmt(int seconds)
     {

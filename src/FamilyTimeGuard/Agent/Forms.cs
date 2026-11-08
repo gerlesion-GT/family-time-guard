@@ -233,59 +233,6 @@ internal sealed class PinForm : Form
     }
 }
 
-internal sealed class ParentForm : Form
-{
-    public ParentForm(string pin, string childName)
-    {
-        Text = $"Parent options{(string.IsNullOrEmpty(childName) ? "" : " – " + childName)}";
-        FormBorderStyle = FormBorderStyle.FixedDialog;
-        MaximizeBox = MinimizeBox = false;
-        StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 480);
-        Font = Theme.Body;
-        TopMost = true;
-
-        var result = new Label { Location = new Point(20, 430), Size = new Size(380, 40), ForeColor = Color.DarkGreen };
-        var y = 15;
-
-        void Section(string text)
-        {
-            Controls.Add(new Label { Text = text, Location = new Point(20, y), AutoSize = true, Font = Theme.Title });
-            y += 32;
-        }
-
-        void Row(params (string Text, string Action, int Minutes)[] buttons)
-        {
-            var x = 20;
-            foreach (var (text, action, minutes) in buttons)
-            {
-                var b = new Button { Text = text, Location = new Point(x, y), Size = new Size(120, 34) };
-                b.Click += async (_, _) =>
-                {
-                    b.Enabled = false;
-                    var r = await ParentActions.Send(action, minutes, pin);
-                    b.Enabled = true;
-                    result.ForeColor = r.Ok ? Color.DarkGreen : Color.Firebrick;
-                    result.Text = r.Ok ? r.Message : r.Error;
-                };
-                Controls.Add(b);
-                x += 128;
-            }
-            y += 44;
-        }
-
-        Section("Extra game time (today)");
-        Row(("+15 min", "bonus-games", 15), ("+30 min", "bonus-games", 30), ("+60 min", "bonus-games", 60));
-        Section("Extra YouTube time (today)");
-        Row(("+15 min", "bonus-youtube", 15), ("+30 min", "bonus-youtube", 30), ("+60 min", "bonus-youtube", 60));
-        Section("Extra screen time (today)");
-        Row(("+15 min", "bonus-screen", 15), ("+30 min", "bonus-screen", 30), ("+60 min", "bonus-screen", 60));
-        Section("Pause all rules (incl. bedtime)");
-        Row(("1 hour", "pause", 60), ("3 hours", "pause", 180), ("Resume now", "resume", 0));
-        Controls.Add(result);
-    }
-}
-
 internal static class ParentActions
 {
     public static async Task<AgentResponse> Send(string action, int minutes, string pin)

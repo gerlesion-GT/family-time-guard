@@ -29,6 +29,17 @@ jobs:
           -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
           -p:EnableCompressionInSingleFile=true -p:DebugType=none -o publish
 
+      - name: Draw UI previews (dashboard and lock screen)
+        shell: pwsh
+        run: ./publish/FamilyTimeGuard.exe render-ui ui-previews
+        continue-on-error: true
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ui-previews
+          path: ui-previews/
+        continue-on-error: true
+
       - name: Assemble package
         shell: pwsh
         run: |

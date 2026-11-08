@@ -85,6 +85,19 @@ public sealed class StatusInfo
     public int ScreenLeftSeconds { get; set; } = -1;
     public int ScreenBudgetSeconds { get; set; } = -1;
     public bool ScreenTimeUp { get; set; }
+    public bool CountingScreen { get; set; }
+
+    // Time used today (shown on the dashboard even when there is no limit).
+    public int GamesUsedSeconds { get; set; }
+    public int YouTubeUsedSeconds { get; set; }
+    public int ScreenUsedSeconds { get; set; }
+
+    // Extra minutes given today.
+    public int BonusGamesMinutes { get; set; }
+    public int BonusYouTubeMinutes { get; set; }
+    public int BonusScreenMinutes { get; set; }
+
+    public bool ParentLocked { get; set; }
 }
 
 /// <summary>Stores the parent PIN as a salted PBKDF2 hash.</summary>
