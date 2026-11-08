@@ -26,12 +26,18 @@ Each child has two bedtime rules:
 
 DAILY MINUTES
 -------------
-    "schoolDayBudget": { "gamesMinutes": 45,  "youTubeMinutes": 30 },
-    "weekendBudget":   { "gamesMinutes": 120, "youTubeMinutes": 60 },
+    "schoolDayBudget": { "gamesMinutes": 45,  "youTubeMinutes": 30, "screenMinutes": -1 },
+    "weekendBudget":   { "gamesMinutes": 120, "youTubeMinutes": 60, "screenMinutes": -1 },
 
   - schoolDayBudget = Monday to Friday
   - weekendBudget   = Saturday, Sunday and holidays
   - Use 0 for "not allowed at all that day" and -1 for "no limit".
+  - screenMinutes = TOTAL time on the computer per day (everything, homework too).
+    -1 = no limit (the default). When it is used up the computer locks like at bedtime:
+    warnings at 15, 5 and 1 minute, then a full-screen message with a "Shut down" button,
+    and the child is signed out after 60 seconds. Time away from the keyboard (5+ minutes
+    without typing or moving the mouse, and no game or video running) is not counted.
+    From the phone: /set school screen 180   or   /bonus screen 30
 
 
 HOLIDAYS AND SCHOOL BREAKS

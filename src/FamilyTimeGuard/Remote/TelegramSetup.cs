@@ -66,13 +66,19 @@ internal static class TelegramSetup
         Console.WriteLine("   2. Tap Start");
         Console.WriteLine($"   3. Send this message:   /pair {code}");
         Console.WriteLine();
-        Console.WriteLine($"  Waiting for your message (up to {PairingWindow.TotalMinutes:0} minutes)...");
+        Console.WriteLine($"  Waiting for your message (up to {PairingWindow.TotalMinutes:0} minutes). Press Esc to cancel...");
 
         var deadline = DateTime.UtcNow + PairingWindow;
         while (DateTime.UtcNow < deadline)
         {
+            if (CancelPressed())
+            {
+                Console.WriteLine("  Cancelled. You can set it up later from the Start menu:");
+                Console.WriteLine("  Family Time Guard > Set up phone remote (parents)");
+                return 3;
+            }
             List<TgUpdate> updates;
-            try { updates = await api.GetUpdates(offset, 20); }
+            try { updates = await api.GetUpdates(offset, 3); }
             catch (TelegramException ex)
             {
                 Console.WriteLine("  " + ex.Message + " Retrying...");
@@ -135,6 +141,28 @@ internal static class TelegramSetup
             return 0;
         }
         catch (TelegramException ex) { Console.WriteLine(ex.Message); return 5; }
+    }
+
+    public static int AskDuringInstall(string[] args)
+    {
+        var cfg = Cli.Load();
+        cfg.Telegram.AskDuringInstall = !(args.Length > 1 && args[1].Equals("false", StringComparison.OrdinalIgnoreCase));
+        Cli.Save(cfg);
+        return 0;
+    }
+
+    private static bool CancelPressed()
+    {
+        try
+        {
+            while (!Console.IsInputRedirected && Console.KeyAvailable)
+            {
+                var k = Console.ReadKey(intercept: true);
+                if (k.Key is ConsoleKey.Escape or ConsoleKey.S) return true;
+            }
+        }
+        catch (InvalidOperationException) { }
+        return false;
     }
 
     public static int TurnOff()

@@ -147,6 +147,9 @@ public sealed class TelegramSettings
     /// <summary>Local time for the evening summary. Empty = no summary.</summary>
     public string DailySummaryAt { get; set; } = "21:30";
 
+    /// <summary>false = the installer does not offer to set up the phone remote.</summary>
+    public bool AskDuringInstall { get; set; } = true;
+
     /// <summary>Optional proxy for reaching Telegram, e.g. "http://192.168.0.10:8080".</summary>
     public string? Proxy { get; set; }
 
@@ -216,6 +219,10 @@ public sealed class DailyBudget
 
     /// <summary>Minutes of YouTube per day. -1 = unlimited, 0 = no YouTube.</summary>
     public int YouTubeMinutes { get; set; } = 30;
+
+    /// <summary>Total minutes on the computer per day (everything, including homework). -1 = no limit.
+    /// When used up, the computer locks like at bedtime.</summary>
+    public int ScreenMinutes { get; set; } = -1;
 }
 
 public static class TimeParse

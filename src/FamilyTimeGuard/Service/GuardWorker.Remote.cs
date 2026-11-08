@@ -70,7 +70,7 @@ internal sealed partial class GuardWorker
                 return ("This request has already been answered or has expired.", (originalText ?? "") + "\n\n(expired)");
 
             var local = LocalNow;
-            var what = req.Kind == "games" ? "game" : "YouTube";
+            var what = req.Kind switch { "games" => "game", "youtube" => "YouTube", _ => "computer" };
             if (parts[2] == "ok" && parts.Length == 4 && int.TryParse(parts[3], out var minutes) && minutes is > 0 and <= 240)
             {
                 var usage = _usage.Get(req.Child, DateOnly.FromDateTime(local));
@@ -146,7 +146,7 @@ internal sealed partial class GuardWorker
         if (usage.RequestsToday >= MaxRequestsPerDay)
             return new AgentResponse { Ok = false, Error = $"You can ask {MaxRequestsPerDay} times a day. Try again tomorrow." };
 
-        var kind = r.Kind == "youtube" ? "youtube" : "games";
+        var kind = r.Kind is "youtube" or "screen" ? r.Kind : "games";
         var minutes = r.Minutes is 15 or 30 or 60 ? r.Minutes : 15;
         var note = string.IsNullOrWhiteSpace(r.Note) ? null : r.Note.Trim()[..Math.Min(r.Note.Trim().Length, 150)];
         usage.RequestsToday++;
@@ -157,7 +157,7 @@ internal sealed partial class GuardWorker
 
         var child = cfg.FindChildByName(st.Child)!;
         var budget = Schedule.BudgetFor(cfg, child, day);
-        var what = kind == "games" ? "games" : "YouTube";
+        var what = kind switch { "games" => "games", "youtube" => "YouTube", _ => "computer time" };
         var text = $"🙋 {st.Child} asks for {minutes} more minutes of {what}." +
                    (note is null ? "" : $"\n“{note}”") +
                    $"\n\n{Reports.Status(child, st.LastResult, usage, budget, true, false, false)}";
@@ -168,6 +168,24 @@ internal sealed partial class GuardWorker
         ]);
         Log.Activity(local, st.Child, "request-sent", $"{minutes} min {kind}" + (note is null ? "" : $": {note}"));
         return new AgentResponse { Ok = true, Message = "Request sent to your parent. The answer will pop up here." };
+    }
+
+    private AgentResponse HandleShutdown(PipeClient client)
+    {
+        if (client.SessionId < 0 || !_sessions.TryGetValue(client.SessionId, out var st))
+            return new AgentResponse { Ok = false, Error = "Not allowed." };
+        Log.Activity(LocalNow, st.Child, "shutdown", "from the lock screen");
+        Log.Info($"Shutting down at the request of {st.Child}.");
+        try
+        {
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("shutdown.exe", "/s /t 0") { CreateNoWindow = true, UseShellExecute = false });
+            return new AgentResponse { Ok = true, Message = "Shutting down..." };
+        }
+        catch (Exception ex)
+        {
+            Log.Error("Shutdown failed", ex);
+            return new AgentResponse { Ok = false, Error = "Could not shut down: " + ex.Message };
+        }
     }
 
     private string ExecuteRemoteLocked(string text)
@@ -229,7 +247,7 @@ internal sealed partial class GuardWorker
                 RuleEngine.AddBonus(usage, b.Kind, b.Minutes);
                 _usage.MarkDirty(usage);
                 _usage.Flush();
-                var what = b.Kind == "games" ? "game" : "YouTube";
+                var what = b.Kind switch { "games" => "game", "youtube" => "YouTube", _ => "computer" };
                 NotifyChild(child.Name, "Extra time!", $"Your parent gave you {b.Minutes} extra minutes of {what} time today.");
                 Log.Activity(local, child.Name, "parent-action", $"phone: +{b.Minutes} min {b.Kind}");
                 return $"✅ Added {b.Minutes} min of {what} time for {child.Name} today.\n\n" +

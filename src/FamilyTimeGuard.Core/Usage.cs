@@ -11,6 +11,8 @@ public sealed class UsageDay
     public double YouTubeSeconds { get; set; }
     public int BonusGamesMinutes { get; set; }
     public int BonusYouTubeMinutes { get; set; }
+    public double ScreenSeconds { get; set; }
+    public int BonusScreenMinutes { get; set; }
 
     /// <summary>"Ask for more time" requests sent today.</summary>
     public int RequestsToday { get; set; }

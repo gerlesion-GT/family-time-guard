@@ -34,7 +34,8 @@ STEP 2 - Install
        - Whose computer is this?  -> 1 for Boong, 2 for Chip
        - Which Windows account does the child use?  -> pick the number
        - Choose a parent PIN (4-12 digits). Keep it secret.
-       - Set up the phone remote now? -> Y if you have Telegram (see PHONE-GUIDE.txt)
+       - Phone remote (optional): 1 = set up now, 2 = skip for now, 3 = skip and don't ask again
+         (see PHONE-GUIDE.txt; you can always set it up later from the Start menu)
   5. Wait for "All done!".
 
 
@@ -63,7 +64,11 @@ WHAT THE KIDS WILL SEE
   - 15, 5 and 1 minute before bedtime: warnings. At bedtime: a full-screen message
     and the computer logs off after 60 seconds. If they sign in again during the night,
     it logs off again after 60 seconds.
-  - Homework, Office, school websites, Scratch and Roblox Studio never use up their time.
+  - Homework, Office, school websites, Scratch and Roblox Studio never use up their game
+    or YouTube time.
+  - Optional total screen time (off unless you switch it on, see SETTINGS-GUIDE.txt):
+    when it is used up, the computer locks like at bedtime and the only thing left to do
+    is shut it down (there is a "Shut down" button on the lock screen).
 
 
 FOR PARENTS: START MENU SHORTCUTS

@@ -150,6 +150,21 @@ internal static class Native
     [DllImport("user32.dll")]
     public static extern void keybd_event(byte vk, byte scan, uint flags, UIntPtr extraInfo);
 
+    [StructLayout(LayoutKind.Sequential)]
+    public struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+
+    [DllImport("user32.dll")]
+    public static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
+
+    /// <summary>Seconds since the last keyboard or mouse input in this session.</summary>
+    public static int IdleSeconds()
+    {
+        var info = new LASTINPUTINFO { cbSize = (uint)Marshal.SizeOf<LASTINPUTINFO>() };
+        if (!GetLastInputInfo(ref info)) return 0;
+        var idleMs = unchecked((uint)Environment.TickCount - info.dwTime);
+        return (int)Math.Min(idleMs / 1000, int.MaxValue);
+    }
+
     public const byte VK_CONTROL = 0x11;
     public const byte VK_W = 0x57;
     public const uint KEYEVENTF_KEYUP = 0x0002;

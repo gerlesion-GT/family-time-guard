@@ -14,7 +14,7 @@ public sealed record StatusCommand : RemoteCommand;
 public sealed record TodayCommand : RemoteCommand;
 public sealed record HelpCommand : RemoteCommand;
 public sealed record RulesCommand : RemoteCommand;
-public sealed record BonusCommand(string Kind, int Minutes) : RemoteCommand;               // Kind: games | youtube
+public sealed record BonusCommand(string Kind, int Minutes) : RemoteCommand;               // Kind: games | youtube | screen
 public sealed record SetBudgetCommand(string DayType, string Kind, int Minutes) : RemoteCommand; // DayType: school | weekend
 public sealed record SetBedtimeCommand(string NightType, string Which, string Time) : RemoteCommand; // Which: lock | unlock
 public sealed record PauseCommand(TimeSpan Duration) : RemoteCommand;
@@ -34,8 +34,11 @@ public static class RemoteCommandParser
         /rules – current daily limits and bedtimes
         /bonus games 30 – extra game minutes today
         /bonus youtube 15 – extra YouTube minutes today
+        /bonus screen 30 – extra total computer time today
         /set school games 60 – change the daily limit
-           (school or weekend; games or youtube; minutes, -1 = no limit)
+           (school or weekend; games, youtube or screen; minutes, -1 = no limit)
+        /set school screen 180 – total computer time per day
+           (when used up, the computer locks like at bedtime)
         /bedtime school 21:30 – change bedtime (school or weekend nights)
         /wakeup school 06:30 – change the morning unlock time
         /pause 2h – pause all rules (e.g. 30m, 2h, 1h30m)
@@ -49,6 +52,7 @@ public static class RemoteCommandParser
 
     private static readonly string[] GamesWords = ["games", "game", "g"];
     private static readonly string[] YouTubeWords = ["youtube", "yt", "y", "video", "videos"];
+    private static readonly string[] ScreenWords = ["screen", "pc", "computer", "total", "all"];
     private static readonly string[] SchoolWords = ["school", "schoolday", "schooldays", "weekday", "weekdays", "s"];
     private static readonly string[] WeekendWords = ["weekend", "weekends", "holiday", "w"];
 
@@ -105,7 +109,7 @@ public static class RemoteCommandParser
             if (Kind(kindWord) is { } kind && int.TryParse(numWord, out var m) && m is > 0 and <= 600)
                 return new BonusCommand(kind, m);
         }
-        return new InvalidCommand("Example: /bonus games 30  or  /bonus youtube 15");
+        return new InvalidCommand("Example: /bonus games 30  or  /bonus youtube 15  or  /bonus screen 30");
     }
 
     private static RemoteCommand ParseSet(List<string> p)
@@ -113,7 +117,7 @@ public static class RemoteCommandParser
         // /set school games 60
         if (p.Count == 3 && DayType(p[0]) is { } day && Kind(p[1]) is { } kind && int.TryParse(p[2], out var m) && m is >= -1 and <= 24 * 60)
             return new SetBudgetCommand(day, kind, m);
-        return new InvalidCommand("Example: /set school games 60  or  /set weekend youtube 90  (-1 = no limit)");
+        return new InvalidCommand("Example: /set school games 60  or  /set weekend youtube 90  or  /set school screen 180  (-1 = no limit)");
     }
 
     private static RemoteCommand ParseBedtime(List<string> p, string which)
@@ -125,8 +129,13 @@ public static class RemoteCommandParser
             : "Example: /wakeup school 06:30  or  /wakeup weekend 07:30");
     }
 
-    private static string? Kind(string w) =>
-        GamesWords.Contains(w.ToLowerInvariant()) ? "games" : YouTubeWords.Contains(w.ToLowerInvariant()) ? "youtube" : null;
+    private static string? Kind(string w)
+    {
+        w = w.ToLowerInvariant();
+        return GamesWords.Contains(w) ? "games" : YouTubeWords.Contains(w) ? "youtube" : ScreenWords.Contains(w) ? "screen" : null;
+    }
+
+    public static string KindName(string kind) => kind switch { "games" => "games", "youtube" => "YouTube", _ => "screen time" };
 
     private static string? DayType(string w) =>
         SchoolWords.Contains(w.ToLowerInvariant()) ? "school" : WeekendWords.Contains(w.ToLowerInvariant()) ? "weekend" : null;
@@ -159,8 +168,17 @@ public static class RemoteConfigEditor
     public static string Apply(GuardConfig cfg, ChildProfile child, SetBudgetCommand c)
     {
         var budget = c.DayType == "school" ? child.SchoolDayBudget : child.WeekendBudget;
-        if (c.Kind == "games") budget.GamesMinutes = c.Minutes; else budget.YouTubeMinutes = c.Minutes;
-        return $"{child.Name}: {(c.Kind == "games" ? "games" : "YouTube")} on {(c.DayType == "school" ? "school days" : "weekends")} is now {RemoteCommandParser.FormatMinutes(c.Minutes)} per day.";
+        switch (c.Kind)
+        {
+            case "games": budget.GamesMinutes = c.Minutes; break;
+            case "youtube": budget.YouTubeMinutes = c.Minutes; break;
+            default: budget.ScreenMinutes = c.Minutes; break;
+        }
+        var days = c.DayType == "school" ? "school days" : "weekends";
+        return c.Kind == "screen"
+            ? $"{child.Name}: total screen time on {days} is now {RemoteCommandParser.FormatMinutes(c.Minutes)} per day." +
+              (c.Minutes >= 0 ? " When it is used up, the computer locks until tomorrow (like bedtime)." : "")
+            : $"{child.Name}: {RemoteCommandParser.KindName(c.Kind)} on {days} is now {RemoteCommandParser.FormatMinutes(c.Minutes)} per day.";
     }
 
     public static string Apply(GuardConfig cfg, ChildProfile child, SetBedtimeCommand c)
@@ -186,8 +204,8 @@ public static class RemoteConfigEditor
     public static string DescribeRules(GuardConfig cfg, ChildProfile child) =>
         $"""
         {child.Name}'s rules
-        School days: games {RemoteCommandParser.FormatMinutes(child.SchoolDayBudget.GamesMinutes)}, YouTube {RemoteCommandParser.FormatMinutes(child.SchoolDayBudget.YouTubeMinutes)}
-        Weekends: games {RemoteCommandParser.FormatMinutes(child.WeekendBudget.GamesMinutes)}, YouTube {RemoteCommandParser.FormatMinutes(child.WeekendBudget.YouTubeMinutes)}
+        School days: games {RemoteCommandParser.FormatMinutes(child.SchoolDayBudget.GamesMinutes)}, YouTube {RemoteCommandParser.FormatMinutes(child.SchoolDayBudget.YouTubeMinutes)}, screen {RemoteCommandParser.FormatMinutes(child.SchoolDayBudget.ScreenMinutes)}
+        Weekends: games {RemoteCommandParser.FormatMinutes(child.WeekendBudget.GamesMinutes)}, YouTube {RemoteCommandParser.FormatMinutes(child.WeekendBudget.YouTubeMinutes)}, screen {RemoteCommandParser.FormatMinutes(child.WeekendBudget.ScreenMinutes)}
         School nights (Sun–Thu): lock {child.SchoolNights.LockAt}, unlock {child.SchoolNights.UnlockAt}
         Weekend nights (Fri–Sat): lock {child.WeekendNights.LockAt}, unlock {child.WeekendNights.UnlockAt}
         """;

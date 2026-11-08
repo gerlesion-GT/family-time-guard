@@ -44,11 +44,16 @@ Say "  Keep the key private: anyone who has it could pretend to be the bot." 'Ye
 Say "  When you are finished, sign out of Telegram Web on this computer (Settings > Log out)." 'Yellow'
 Say ""
 
+Say "  (To skip this for now, type S and press Enter.)"
 $token = ''
 do {
     $token = (Read-Secret "  Paste the key here (it shows as ***) and press Enter").Trim()
+    if ($token -match '^(s|skip)$') {
+        Say "  Skipped. You can set it up any time from Start > Family Time Guard > Set up phone remote (parents)."
+        exit 3
+    }
     if ($token -notmatch '^\d{5,15}:[A-Za-z0-9_-]{30,60}$') {
-        Say "  That doesn't look like a bot key (numbers, a colon, then letters). Try again, or press Ctrl+C to stop." 'Yellow'
+        Say "  That doesn't look like a bot key (numbers, a colon, then letters). Try again, or type S to skip." 'Yellow'
         $token = ''
     }
 } until ($token)

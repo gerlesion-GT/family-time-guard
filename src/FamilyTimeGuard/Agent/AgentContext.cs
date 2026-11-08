@@ -59,7 +59,7 @@ internal sealed class AgentContext : ApplicationContext
         try
         {
             var fg = ForegroundWindow.Get();
-            var request = new AgentRequest { Type = "report", ForegroundTitle = fg.Title, ForegroundProcess = fg.ProcessName };
+            var request = new AgentRequest { Type = "report", ForegroundTitle = fg.Title, ForegroundProcess = fg.ProcessName, IdleSeconds = Native.IdleSeconds() };
             var response = await Task.Run(() => PipeClientCall.Send(request));
             if (_last is null || _failures >= 3) AgentLog.Write($"Connected to the Guard (rules active: {response.Enforced}).");
             _failures = 0;
@@ -94,7 +94,8 @@ internal sealed class AgentContext : ApplicationContext
             var low = (s.GamesLeftSeconds is >= 0 and < 600) || (s.YouTubeLeftSeconds is >= 0 and < 600);
             var none = s.GamesLeftSeconds == 0 && s.YouTubeLeftSeconds == 0;
             _tray.Icon = s.Paused ? GreenIcon : s.Bedtime || none ? RedIcon : low ? AmberIcon : GreenIcon;
-            var text = $"Games {Fmt(s.GamesLeftSeconds)} · YouTube {Fmt(s.YouTubeLeftSeconds)}";
+            var text = (s.ScreenLeftSeconds >= 0 ? $"Screen {Fmt(s.ScreenLeftSeconds)} · " : "") +
+                       $"Games {Fmt(s.GamesLeftSeconds)} · YouTube {Fmt(s.YouTubeLeftSeconds)}";
             if (s.NextBedtime is not null) text += $" · Bed {s.NextBedtime}";
             if (s.Paused) text = "Rules paused by parent";
             _tray.Text = text.Length > 120 ? text[..120] : text;
@@ -112,7 +113,8 @@ internal sealed class AgentContext : ApplicationContext
         {
             if (_bedtimeForm is null || _bedtimeForm.IsDisposed)
             {
-                _bedtimeForm = new BedtimeForm(r.ChildName ?? "", s?.UnlockAt, r.LockMessage);
+                _bedtimeForm = new BedtimeForm(r.ChildName ?? "", s?.UnlockAt, r.LockTitle, r.LockMessage,
+                    canAsk: r.RemoteEnabled && s?.ScreenTimeUp == true && r.LockTitle == "Screen time is over");
                 _bedtimeForm.Show();
             }
             _bedtimeForm.UpdateCountdown(secs);
@@ -138,6 +140,8 @@ internal sealed class AgentContext : ApplicationContext
         if (s.Paused) sb.AppendLine($"A parent paused the rules{(s.PausedUntil is null ? "" : " until " + s.PausedUntil)}.\n");
         sb.AppendLine($"Game time left today:     {Fmt(s.GamesLeftSeconds)}{Of(s.GamesBudgetSeconds)}");
         sb.AppendLine($"YouTube time left today:  {Fmt(s.YouTubeLeftSeconds)}{Of(s.YouTubeBudgetSeconds)}");
+        if (s.ScreenLeftSeconds >= 0)
+            sb.AppendLine($"Screen time left today:   {Fmt(s.ScreenLeftSeconds)}{Of(s.ScreenBudgetSeconds)}");
         sb.AppendLine(s.Bedtime ? $"It's bedtime. The computer unlocks at {s.UnlockAt}." : $"Bedtime tonight:          {s.NextBedtime}");
         sb.AppendLine();
         sb.AppendLine("Homework, school sites, Office, Scratch and Roblox Studio don't use up your time.");

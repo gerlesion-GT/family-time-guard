@@ -39,6 +39,7 @@ internal static class Program
                 "telegram-setup" => Remote.TelegramSetup.Run(args).GetAwaiter().GetResult(),
                 "telegram-test" => Remote.TelegramSetup.Test().GetAwaiter().GetResult(),
                 "telegram-off" => Remote.TelegramSetup.TurnOff(),
+                "telegram-ask-during-install" => Remote.TelegramSetup.AskDuringInstall(args),
                 _ => Cli.Help(),
             };
         }

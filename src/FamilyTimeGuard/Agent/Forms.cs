@@ -107,7 +107,7 @@ internal sealed class BedtimeForm : Form
     private readonly Label _countdown;
     private bool _allowClose;
 
-    public BedtimeForm(string childName, string? unlockAt, string? lockMessage = null)
+    public BedtimeForm(string childName, string? unlockAt, string? lockTitle = null, string? lockMessage = null, bool canAsk = false)
     {
         FormBorderStyle = FormBorderStyle.None;
         WindowState = FormWindowState.Maximized;
@@ -116,8 +116,9 @@ internal sealed class BedtimeForm : Form
         BackColor = Color.FromArgb(12, 20, 45);
         ForeColor = Theme.LightText;
 
-        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 5 };
+        var layout = new TableLayoutPanel { Dock = DockStyle.Fill, ColumnCount = 1, RowCount = 6 };
         layout.RowStyles.Add(new RowStyle(SizeType.Percent, 35));
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
         layout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
@@ -130,14 +131,48 @@ internal sealed class BedtimeForm : Form
         };
 
         layout.Controls.Add(new Label(), 0, 0);
-        var title = lockMessage is null
-            ? $"It's bedtime{(string.IsNullOrEmpty(childName) ? "" : ", " + childName)}."
-            : "Computer locked";
+        var title = lockTitle ?? $"It's bedtime{(string.IsNullOrEmpty(childName) ? "" : ", " + childName)}.";
         layout.Controls.Add(Centered(title, Theme.Huge), 0, 1);
         _countdown = Centered("", Theme.Large);
         layout.Controls.Add(_countdown, 0, 2);
         layout.Controls.Add(Centered(lockMessage ?? (unlockAt is null ? "Sleep well!" : $"The computer unlocks at {unlockAt}. Sleep well!"), Theme.Large), 0, 3);
-        layout.Controls.Add(new Label(), 0, 4);
+
+        // Buttons: shut down (always), and ask a parent for more time (screen time, when the phone remote is set up).
+        var buttons = new FlowLayoutPanel { AutoSize = true, Anchor = AnchorStyles.None, Padding = new Padding(0, 24, 0, 0) };
+        Button Big(string text) => new()
+        {
+            Text = text, AutoSize = true, Padding = new Padding(18, 8, 18, 8), Margin = new Padding(12),
+            FlatStyle = FlatStyle.Flat, BackColor = Color.White, ForeColor = Theme.Blue, Font = Theme.Title,
+        };
+        var shutdown = Big("Shut down the computer");
+        shutdown.Click += async (_, _) =>
+        {
+            shutdown.Enabled = false;
+            var r = await Task.Run(() =>
+            {
+                try { return PipeClientCall.Send(new AgentRequest { Type = "shutdown" }, 4000); }
+                catch (Exception ex) { return new AgentResponse { Ok = false, Error = ex.Message }; }
+            });
+            if (!r.Ok)
+            {
+                // Fall back to shutting down as the user (allowed for standard users on home PCs).
+                try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo("shutdown.exe", "/s /t 0") { CreateNoWindow = true, UseShellExecute = false }); }
+                catch (Exception) { shutdown.Enabled = true; }
+            }
+        };
+        buttons.Controls.Add(shutdown);
+        if (canAsk)
+        {
+            var ask = Big("Ask for more time");
+            ask.Click += (_, _) =>
+            {
+                using var f = new AskForTimeForm("screen");
+                f.ShowDialog(this);
+            };
+            buttons.Controls.Add(ask);
+        }
+        layout.Controls.Add(buttons, 0, 4);
+        layout.Controls.Add(new Label(), 0, 5);
         Controls.Add(layout);
     }
 
@@ -206,11 +241,11 @@ internal sealed class ParentForm : Form
         FormBorderStyle = FormBorderStyle.FixedDialog;
         MaximizeBox = MinimizeBox = false;
         StartPosition = FormStartPosition.CenterScreen;
-        ClientSize = new Size(420, 400);
+        ClientSize = new Size(420, 480);
         Font = Theme.Body;
         TopMost = true;
 
-        var result = new Label { Location = new Point(20, 350), Size = new Size(380, 40), ForeColor = Color.DarkGreen };
+        var result = new Label { Location = new Point(20, 430), Size = new Size(380, 40), ForeColor = Color.DarkGreen };
         var y = 15;
 
         void Section(string text)
@@ -243,6 +278,8 @@ internal sealed class ParentForm : Form
         Row(("+15 min", "bonus-games", 15), ("+30 min", "bonus-games", 30), ("+60 min", "bonus-games", 60));
         Section("Extra YouTube time (today)");
         Row(("+15 min", "bonus-youtube", 15), ("+30 min", "bonus-youtube", 30), ("+60 min", "bonus-youtube", 60));
+        Section("Extra screen time (today)");
+        Row(("+15 min", "bonus-screen", 15), ("+30 min", "bonus-screen", 30), ("+60 min", "bonus-screen", 60));
         Section("Pause all rules (incl. bedtime)");
         Row(("1 hour", "pause", 60), ("3 hours", "pause", 180), ("Resume now", "resume", 0));
         Controls.Add(result);
@@ -271,7 +308,7 @@ internal static class ParentActions
 /// <summary>The child asks the parent (on their phone) for more time.</summary>
 internal sealed class AskForTimeForm : Form
 {
-    public AskForTimeForm()
+    public AskForTimeForm(string initialKind = "games")
     {
         Text = "Ask for more time";
         FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -285,10 +322,12 @@ internal sealed class AskForTimeForm : Form
         Controls.Add(new Label { Text = "What for?", Location = new Point(20, y), AutoSize = true, Font = Theme.Title });
         y += 32;
         var games = new RadioButton { Text = "Games", Location = new Point(24, y), AutoSize = true, Checked = true };
-        var youtube = new RadioButton { Text = "YouTube", Location = new Point(140, y), AutoSize = true };
+        var youtube = new RadioButton { Text = "YouTube", Location = new Point(140, y), AutoSize = true, Checked = initialKind == "youtube" };
+        var screen = new RadioButton { Text = "Computer", AutoSize = true, Checked = initialKind == "screen" };
+        if (initialKind != "games") games.Checked = false;
         var kindPanel = new Panel { Location = new Point(0, y - 4), Size = new Size(400, 32) };
-        games.Location = new Point(24, 4); youtube.Location = new Point(140, 4);
-        kindPanel.Controls.AddRange([games, youtube]);
+        games.Location = new Point(24, 4); youtube.Location = new Point(130, 4); screen.Location = new Point(250, 4);
+        kindPanel.Controls.AddRange([games, youtube, screen]);
         Controls.Add(kindPanel);
         y += 40;
         Controls.Add(new Label { Text = "How long?", Location = new Point(20, y), AutoSize = true, Font = Theme.Title });
@@ -318,7 +357,7 @@ internal sealed class AskForTimeForm : Form
                         Type = "request-time",
                         Request = new TimeRequest
                         {
-                            Kind = youtube.Checked ? "youtube" : "games",
+                            Kind = youtube.Checked ? "youtube" : screen.Checked ? "screen" : "games",
                             Minutes = minutes.SelectedIndex switch { 1 => 30, 2 => 60, _ => 15 },
                             Note = note.Text,
                         },

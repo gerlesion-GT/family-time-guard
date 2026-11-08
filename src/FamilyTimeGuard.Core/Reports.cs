@@ -47,6 +47,7 @@ public static class Reports
         sb.Append(child.Name).Append(": ");
         if (live is null) sb.Append(online ? "not signed in right now." : "computer is off or offline.");
         else if (locked) sb.Append("locked by you.");
+        else if (live.ScreenTimeUp) sb.Append("screen time is used up for today.");
         else if (live.Bedtime) sb.Append($"bedtime, unlocks at {live.UnlockAtLocal:HH:mm}.");
         else sb.Append(live.CountingGames ? "playing a game now." : live.CountingYouTube ? "watching YouTube now." : "signed in.");
         sb.AppendLine();
@@ -54,6 +55,8 @@ public static class Reports
         var ytBudget = budget.YouTubeMinutes < 0 ? -1 : budget.YouTubeMinutes + usage.BonusYouTubeMinutes;
         sb.AppendLine($"Games: {Used(usage.GamesSeconds)} used, {Left(gamesBudget, usage.GamesSeconds)}");
         sb.AppendLine($"YouTube: {Used(usage.YouTubeSeconds)} used, {Left(ytBudget, usage.YouTubeSeconds)}");
+        if (budget.ScreenMinutes >= 0)
+            sb.AppendLine($"Screen time: {Used(usage.ScreenSeconds)} used, {Left(budget.ScreenMinutes + usage.BonusScreenMinutes, usage.ScreenSeconds)}");
         if (paused) sb.AppendLine("Rules are paused.");
         else if (live?.NextBedtimeLocal is { } bed) sb.AppendLine($"Bedtime: {bed:HH:mm}");
         return sb.ToString().TrimEnd();
@@ -69,8 +72,10 @@ public static class Reports
         var ytBudget = budget.YouTubeMinutes < 0 ? -1 : budget.YouTubeMinutes + usage.BonusYouTubeMinutes;
         sb.AppendLine($"Games: {Used(usage.GamesSeconds)}{Of(gamesBudget)}");
         sb.AppendLine($"YouTube: {Used(usage.YouTubeSeconds)}{Of(ytBudget)}");
-        if (usage.BonusGamesMinutes + usage.BonusYouTubeMinutes > 0)
-            sb.AppendLine($"Extra time given: games +{usage.BonusGamesMinutes} min, YouTube +{usage.BonusYouTubeMinutes} min");
+        sb.AppendLine($"Screen time: {Used(usage.ScreenSeconds)}{Of(budget.ScreenMinutes < 0 ? -1 : budget.ScreenMinutes + usage.BonusScreenMinutes)}");
+        if (usage.BonusGamesMinutes + usage.BonusYouTubeMinutes + usage.BonusScreenMinutes > 0)
+            sb.AppendLine($"Extra time given: games +{usage.BonusGamesMinutes} min, YouTube +{usage.BonusYouTubeMinutes} min" +
+                          (usage.BonusScreenMinutes > 0 ? $", screen +{usage.BonusScreenMinutes} min" : ""));
 
         var games = mine.Where(e => e.Event == "games-start" && e.Detail.Length > 0)
             .SelectMany(e => e.Detail.Split(' ', StringSplitOptions.RemoveEmptyEntries))
@@ -88,6 +93,8 @@ public static class Reports
             if (videos.Count > 10) sb.AppendLine($"…and {videos.Count - 10} more");
         }
 
+        var screenLogoffs = mine.Count(e => e.Event == "screen-logoff");
+        if (screenLogoffs > 0) sb.AppendLine($"Logged off because screen time was used up: {screenLogoffs} time(s)");
         var lateLogins = mine.Count(e => e.Event == "bedtime-logoff");
         if (lateLogins > 0) sb.AppendLine($"Logged off at bedtime: {lateLogins} time(s)");
         var restarts = mine.Count(e => e.Event == "helper-restarted");

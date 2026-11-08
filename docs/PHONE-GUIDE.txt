@@ -8,6 +8,8 @@ ignores messages from anyone else.
 
 SETTING IT UP (about 3 minutes per computer)
 --------------------------------------------
+This is optional. The installer asks: 1) set up now, 2) skip for now, or
+3) skip and don't ask again. You can always set it up later from the Start menu.
 Each computer needs its OWN bot: one for Boong's PC, one for Chip's PC.
 
 On the child's computer, in YOUR parent account:
@@ -34,10 +36,13 @@ COMMANDS
 
   /bonus games 30       30 extra minutes of games today
   /bonus youtube 15     15 extra minutes of YouTube today
+  /bonus screen 30      30 extra minutes of total computer time today
 
   /set school games 60      change the daily limit (school days)
   /set weekend youtube 90   change the daily limit (weekends)
                             use -1 for "no limit", 0 for "not allowed"
+  /set school screen 180    total computer time per day (homework too);
+                            when used up, the computer locks until tomorrow"
   /bedtime school 21:30     change bedtime on school nights (Sun-Thu)
   /bedtime weekend 22:30    change bedtime on weekend nights (Fri-Sat)
   /wakeup school 06:30      change the morning unlock time

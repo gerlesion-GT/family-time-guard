@@ -15,6 +15,7 @@ internal sealed class SessionState
     public DateTimeOffset LastHeartbeat = DateTimeOffset.MinValue;
     public string? ForegroundTitle;
     public string? ForegroundProcess;
+    public int IdleSeconds;
     public int AgentPid = -1;
 
     public DateTimeOffset LastLaunch = DateTimeOffset.MinValue;
@@ -140,7 +141,8 @@ internal sealed partial class GuardWorker : BackgroundService
                 ForegroundTitle: agentConnected ? st.ForegroundTitle : null,
                 ForegroundProcess: agentConnected ? st.ForegroundProcess : null,
                 AgentConnected: helperOk,
-                SessionLocked: session.Locked);
+                SessionLocked: session.Locked,
+                IdleSeconds: agentConnected ? st.IdleSeconds : 0);
 
             var usage = _usage.Get(child.Name, DateOnly.FromDateTime(local));
             var parentLocked = _state.State.IsLocked(child.Name, now);
@@ -155,6 +157,7 @@ internal sealed partial class GuardWorker : BackgroundService
             {
                 if (ev == "games-used-up") Alert($"🎮 {child.Name}'s game time is used up for today.");
                 if (ev == "youtube-used-up") Alert($"📺 {child.Name}'s YouTube time is used up for today.");
+                if (ev == "screen-used-up") Alert($"⏱ {child.Name}'s screen time is used up for today. The computer locks in 1 minute.");
             }
             st.LastResult = result;
             st.PendingNotices.AddRange(result.Notices);
@@ -213,8 +216,10 @@ internal sealed partial class GuardWorker : BackgroundService
             return;
         }
 
-        Log.Activity(local, st.Child, result.ParentLocked ? "locked-logoff" : "bedtime-logoff", session.Locked ? "session was locked" : "");
+        var screenLock = !result.ParentLocked && result.ScreenTimeUp && result.UnlockAtLocal is null;
+        Log.Activity(local, st.Child, result.ParentLocked ? "locked-logoff" : screenLock ? "screen-logoff" : "bedtime-logoff", session.Locked ? "session was locked" : "");
         if (result.ParentLocked) Alert($"🔒 {st.Child} was logged off (locked by you).");
+        else if (screenLock) Alert($"⏱ {st.Child} was logged off at {local:HH:mm}: screen time is used up for today.");
         else if (st.SignedInDuringBedtime) Alert($"🌙 {st.Child} signed in during bedtime ({local:HH:mm}) and was logged off.");
         else Alert($"🌙 Bedtime: {st.Child} was logged off at {local:HH:mm}.");
         Log.Info($"Bedtime: logging off {session.UserName} (session {session.SessionId}).");
@@ -277,6 +282,7 @@ internal sealed partial class GuardWorker : BackgroundService
                 "report" => HandleReport(req, client),
                 "parent" => HandleParent(req, client),
                 "request-time" => HandleTimeRequest(req, client),
+                "shutdown" => HandleShutdown(client),
                 "status" => HandleStatus(),
                 _ => new AgentResponse { Ok = false, Error = "Unknown request" },
             };
@@ -293,6 +299,7 @@ internal sealed partial class GuardWorker : BackgroundService
         st.LaunchesWithoutHeartbeat = 0;
         st.ForegroundTitle = Truncate(req.ForegroundTitle, 300);
         st.ForegroundProcess = Truncate(req.ForegroundProcess, 100);
+        st.IdleSeconds = Math.Max(0, req.IdleSeconds);
 
         var response = new AgentResponse
         {
@@ -302,9 +309,20 @@ internal sealed partial class GuardWorker : BackgroundService
             Notices = [.. st.PendingNotices],
             CloseForegroundTab = st.PendingCloseTab,
             LogoffInSeconds = st.LogoffInSeconds,
-            LockMessage = st.LastResult?.ParentLocked == true
-                ? $"A parent locked this computer{(_state.State.LockedUntilUtc.TryGetValue(st.Child, out var until) ? " until " + TimeZoneInfo.ConvertTimeFromUtc(until.UtcDateTime, Zone).ToString("ddd HH:mm") : "")}."
-                : null,
+            LockTitle = st.LastResult switch
+            {
+                { ParentLocked: true } => "Computer locked",
+                { ScreenTimeUp: true, UnlockAtLocal: null } => "Screen time is over",
+                _ => null,
+            },
+            LockMessage = st.LastResult switch
+            {
+                { ParentLocked: true } =>
+                    $"A parent locked this computer{(_state.State.LockedUntilUtc.TryGetValue(st.Child, out var until) ? " until " + TimeZoneInfo.ConvertTimeFromUtc(until.UtcDateTime, Zone).ToString("ddd HH:mm") : "")}.",
+                { ScreenTimeUp: true, UnlockAtLocal: null } =>
+                    $"You have used all your computer time for today, {st.Child}. Please shut down the computer.",
+                _ => null,
+            },
             RemoteEnabled = _config.Current.Telegram.IsReady,
         };
         st.PendingNotices.Clear();
@@ -343,14 +361,14 @@ internal sealed partial class GuardWorker : BackgroundService
         {
             case "verify":
                 return new AgentResponse { Ok = true, Message = "PIN accepted." };
-            case "bonus-games" or "bonus-youtube":
+            case "bonus-games" or "bonus-youtube" or "bonus-screen":
                 if (st is null) return new AgentResponse { Ok = false, Error = "This account has no rules, so extra time is not needed." };
                 var usage = _usage.Get(st.Child, DateOnly.FromDateTime(local));
-                var what = cmd.Action == "bonus-games" ? "games" : "youtube";
+                var what = cmd.Action[6..]; // games | youtube | screen
                 RuleEngine.AddBonus(usage, what, minutes);
                 _usage.MarkDirty(usage);
                 _usage.Flush();
-                message = $"Added {minutes} minutes of {(what == "games" ? "game" : "YouTube")} time for {st.Child} today.";
+                message = $"Added {minutes} minutes of {what switch { "games" => "game", "youtube" => "YouTube", _ => "screen" }} time for {st.Child} today.";
                 break;
             case "pause":
                 _state.State.PausedUntilUtc = now.AddMinutes(minutes);
@@ -386,7 +404,7 @@ internal sealed partial class GuardWorker : BackgroundService
         {
             var r = st.LastResult;
             sb.AppendLine($"Session {st.SessionId}: {st.Child} ({st.UserName}), helper {(DateTimeOffset.UtcNow - st.LastHeartbeat < HeartbeatTimeout ? "connected" : "NOT connected")}" +
-                          (r is null ? "" : $", games left {Fmt(r.GamesLeftSeconds)}, YouTube left {Fmt(r.YouTubeLeftSeconds)}, bedtime {(r.Bedtime ? "NOW" : r.NextBedtimeLocal?.ToString("HH:mm"))}"));
+                          (r is null ? "" : $", games left {Fmt(r.GamesLeftSeconds)}, YouTube left {Fmt(r.YouTubeLeftSeconds)}, screen left {Fmt(r.ScreenLeftSeconds)}, bedtime {(r.Bedtime ? "NOW" : r.NextBedtimeLocal?.ToString("HH:mm"))}"));
             if (st.YouTubeBlockReason is not null) sb.AppendLine($"  YouTube is blocked for {st.Child} because {st.YouTubeBlockReason}.");
         }
         if (_sessions.Count == 0) sb.AppendLine("No child is logged in right now.");
@@ -413,6 +431,9 @@ internal sealed partial class GuardWorker : BackgroundService
                 ? TimeZoneInfo.ConvertTimeFromUtc(p.UtcDateTime, Zone).ToString("HH:mm") : null,
             CountingGames = r.CountingGames,
             CountingYouTube = r.CountingYouTube,
+            ScreenLeftSeconds = r.ScreenLeftSeconds,
+            ScreenBudgetSeconds = r.ScreenBudgetSeconds,
+            ScreenTimeUp = r.ScreenTimeUp,
         };
     }
 

@@ -6,7 +6,8 @@ public sealed record Observation(
     string? ForegroundTitle,
     string? ForegroundProcess,
     bool AgentConnected,
-    bool SessionLocked);
+    bool SessionLocked,
+    int IdleSeconds = 0);
 
 public sealed record Notice(string Kind, string Title, string Message)
 {
@@ -22,6 +23,11 @@ public sealed class TickResult
     public bool Bedtime { get; set; }
     /// <summary>A parent locked the computer from the phone (enforced like bedtime).</summary>
     public bool ParentLocked { get; set; }
+    /// <summary>Total screen time is used up for today (enforced like bedtime).</summary>
+    public bool ScreenTimeUp { get; set; }
+    public int ScreenBudgetSeconds { get; set; } = -1;
+    public int ScreenLeftSeconds { get; set; } = -1;
+    public bool CountingScreen { get; set; }
     public DateTime? NextBedtimeLocal { get; set; }
     public DateTime? UnlockAtLocal { get; set; }
 
@@ -50,6 +56,8 @@ public sealed class TickResult
 public static class RuleEngine
 {
     public static readonly TimeSpan MaxTickCredit = TimeSpan.FromSeconds(10);
+    /// <summary>No keyboard/mouse for this long (and no game or video) = away from the computer.</summary>
+    public const int IdleAfterSeconds = 300;
     private static readonly Random Rng = new();
 
     public static TickResult Tick(
@@ -80,9 +88,18 @@ public static class RuleEngine
         // ---- Count time ----
         if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
         if (elapsed > MaxTickCredit) elapsed = MaxTickCredit; // e.g. after sleep/hibernate
-        var counting = !paused && !r.Bedtime && !obs.SessionLocked;
+        var screenBudgetMinutes = budget.ScreenMinutes < 0 ? -1 : budget.ScreenMinutes + usage.BonusScreenMinutes;
+        var screenAlreadyUp = screenBudgetMinutes >= 0 && usage.ScreenSeconds >= screenBudgetMinutes * 60;
+        var counting = !paused && !r.Bedtime && !screenAlreadyUp && !obs.SessionLocked;
         if (counting && playingGames) { usage.GamesSeconds += elapsed.TotalSeconds; r.CountingGames = true; }
         if (counting && fgYouTube) { usage.YouTubeSeconds += elapsed.TotalSeconds; r.CountingYouTube = true; }
+        if (counting && (obs.IdleSeconds < IdleAfterSeconds || playingGames || fgYouTube))
+        {
+            usage.ScreenSeconds += elapsed.TotalSeconds;
+            r.CountingScreen = true;
+        }
+        r.ScreenBudgetSeconds = budget.ScreenMinutes < 0 ? -1 : (budget.ScreenMinutes + usage.BonusScreenMinutes) * 60;
+        r.ScreenLeftSeconds = r.ScreenBudgetSeconds < 0 ? -1 : Math.Max(0, (int)(r.ScreenBudgetSeconds - usage.ScreenSeconds));
 
         r.GamesBudgetSeconds = budget.GamesMinutes < 0 ? -1 : (budget.GamesMinutes + usage.BonusGamesMinutes) * 60;
         r.YouTubeBudgetSeconds = budget.YouTubeMinutes < 0 ? -1 : (budget.YouTubeMinutes + usage.BonusYouTubeMinutes) * 60;
@@ -90,6 +107,26 @@ public static class RuleEngine
         r.YouTubeLeftSeconds = r.YouTubeBudgetSeconds < 0 ? -1 : Math.Max(0, (int)(r.YouTubeBudgetSeconds - usage.YouTubeSeconds));
 
         if (paused) return r; // a parent paused the rules: count nothing, block nothing
+
+        // ---- Total screen time: when used up, the computer locks like at bedtime ----
+        if (r.ScreenLeftSeconds == 0)
+        {
+            r.ScreenTimeUp = true;
+            if (!r.Bedtime && WarnOnce(r, usage, true, "scr0", Notice.Toast, "Screen time is over for today",
+                    "The computer will sign you out in 1 minute. You can shut it down now."))
+                r.Events.Add("screen-used-up");
+            r.Bedtime = true;
+        }
+        else if (r.ScreenLeftSeconds > 0 && r.CountingScreen)
+        {
+            var left = r.ScreenLeftSeconds;
+            WarnOnce(r, usage, left <= 900 && left > 300, "scr15", Notice.Toast, "15 minutes of screen time left",
+                $"Start finishing up, {child.Name}. The computer locks when screen time is used up.");
+            WarnOnce(r, usage, left <= 300 && left > 60, "scr5", Notice.Toast, "5 minutes of screen time left",
+                "Save your game and your work now.");
+            WarnOnce(r, usage, left <= 60, "scr1", Notice.Big, "1 minute of screen time left",
+                "Please save everything now. The computer will lock in a minute.");
+        }
 
         // ---- Bedtime warnings (the actual log-off is done by the service with a countdown) ----
         if (r.NextBedtimeLocal is { } bed)
@@ -173,6 +210,11 @@ public static class RuleEngine
         {
             usage.BonusYouTubeMinutes += minutes;
             usage.Flags.RemoveWhere(f => f.StartsWith("yt", StringComparison.Ordinal));
+        }
+        else if (what == "screen")
+        {
+            usage.BonusScreenMinutes += minutes;
+            usage.Flags.RemoveWhere(f => f.StartsWith("scr", StringComparison.Ordinal));
         }
         else throw new ArgumentException($"Unknown bonus type '{what}'.");
     }

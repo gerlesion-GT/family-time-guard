@@ -11,6 +11,14 @@ New in Phase 2 (Telegram, one private bot per computer, only you can control it)
 - Kids can tap "Ask for more time" on the clock icon; you get Approve/No buttons.
 - Alerts (time used up, bedtime log-offs, night-time sign-ins, helper stopped, wrong PIN) and an evening summary.
 
+New: total screen time (optional, off by default)
+- Set a daily limit for ALL computer use: `/set school screen 180` or `"screenMinutes"` in the settings.
+- When it is used up, the computer locks like at bedtime: warnings at 15/5/1 minutes, then a full-screen message with a
+  "Shut down" button (and "Ask for more time" if the phone remote is set up), and sign-out after 60 seconds.
+- Time away from the keyboard (5+ minutes idle, no game or video) is not counted. `/bonus screen 30` gives extra time.
+
+Installer: the phone remote is now clearly optional – set up now, skip for now, or skip and don't ask again.
+
 Also fixed:
 - YouTube is no longer blocked for a parent while a child's account is only signed in in the background ("Switch user").
 - Upgrading no longer fails when a child is signed in: the installer waits for the old tray helper to close, and if it

@@ -7,7 +7,8 @@ param(
     [string]$ChildName,       # "Boong" or "Chip"
     [string]$Account,         # the child's Windows user name
     [string]$Pin,             # parent PIN (4-12 digits)
-    [switch]$NonInteractive   # for automated tests
+    [switch]$NonInteractive,  # for automated tests
+    [switch]$SkipPhone        # don't offer the phone remote setup
 )
 
 $ErrorActionPreference = 'Stop'
@@ -177,22 +178,40 @@ if ($Pin -or $needPin) {
 }
 
 # ---------------------------------------------------------------- phone remote
-$remoteReady = (Get-Content $ConfigFile -Raw) -match '"ownerChatId":\s*-?\d'
-if (-not $NonInteractive -and -not $remoteReady) {
-    Step "Phone remote (Telegram)"
-    Say "  With the phone remote you can check time left, give extra time, change limits,"
-    Say "  lock the computer and get alerts - from anywhere."
-    $answer = Read-Host "  Set it up now? You need Telegram on your phone (about 3 minutes) [Y/n]"
-    if ($answer -notmatch '^[Nn]') {
-        $phoneArgs = @{ FromInstaller = $true }
-        if ($ChildName) { $phoneArgs.PcName = "$ChildName's PC" }
-        & (Join-Path $InstallDir 'Setup-Phone.ps1') @phoneArgs
-    } else {
-        Say "  Skipped. Set it up later from Start > Family Time Guard > Set up phone remote (parents)."
-    }
-} elseif ($remoteReady) {
+$cfgText = Get-Content $ConfigFile -Raw
+$remoteReady = $cfgText -match '"ownerChatId":\s*-?\d'
+$dontAsk = $cfgText -match '"askDuringInstall":\s*false'
+$phoneLater = "Start > Family Time Guard > Set up phone remote (parents)"
+if ($remoteReady) {
     Say ""
     Say "  Phone remote: already connected."
+} elseif ($SkipPhone -or $NonInteractive) {
+    # Not asked (automated install, or -SkipPhone).
+} elseif ($dontAsk) {
+    Say ""
+    Say "  Phone remote: not set up. You can set it up any time from $phoneLater."
+} else {
+    Step "Phone remote (Telegram) - optional"
+    Say "  With the phone remote you can check time left, give extra time, change limits,"
+    Say "  lock the computer and get alerts - from anywhere. You need Telegram on your phone."
+    Say ""
+    Say "  1) Set it up now (about 3 minutes)"
+    Say "  2) Skip for now - ask me again next time I run the installer"
+    Say "  3) Skip and don't ask again (I can still set it up later from the Start menu)"
+    do { $choice = Read-Host "  Type 1, 2 or 3 and press Enter" } until ($choice -in '1', '2', '3')
+    switch ($choice) {
+        '1' {
+            $phoneArgs = @{ FromInstaller = $true }
+            if ($ChildName) { $phoneArgs.PcName = "$ChildName's PC" }
+            & (Join-Path $InstallDir 'Setup-Phone.ps1') @phoneArgs
+            if ($LASTEXITCODE -ne 0) { Say "  Continuing without the phone remote. Set it up later from $phoneLater." 'Yellow' }
+        }
+        '2' { Say "  Skipped. You can set it up any time from $phoneLater." }
+        '3' {
+            & $Exe telegram-ask-during-install false | Out-Null
+            Say "  OK, I won't ask again. You can still set it up from $phoneLater."
+        }
+    }
 }
 
 # ---------------------------------------------------------------- service
