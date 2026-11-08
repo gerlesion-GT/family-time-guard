@@ -159,6 +159,7 @@ internal sealed class DashboardForm : Form
         private readonly Label _left = new() { AutoSize = true, Font = new Font("Segoe UI Semibold", 12f), Anchor = AnchorStyles.Left };
         private readonly Label _detail = new() { AutoSize = true, ForeColor = Color.DimGray, Anchor = AnchorStyles.Left };
         private readonly Bar _bar;
+        private readonly FlowLayoutPanel _buttons;
 
         public Row(DashboardForm owner, string name, string kind, Color color)
         {
@@ -168,7 +169,7 @@ internal sealed class DashboardForm : Form
             var nameLabel = new Label { Text = name, AutoSize = true, Font = new Font("Segoe UI Semibold", 10.5f), Margin = new Padding(0, 0, 0, 2) };
             _bar = new Bar(color) { Width = 330, Height = 14, Margin = new Padding(0, 2, 0, 4) };
 
-            var buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = new Padding(8, 0, 0, 0) };
+            var buttons = _buttons = new FlowLayoutPanel { AutoSize = true, WrapContents = false, Anchor = AnchorStyles.Left, Margin = new Padding(8, 0, 0, 0) };
             foreach (var m in new[] { 15, 30, 60 })
             {
                 var b = new Button { Text = $"+{m}", Width = 52, Height = 30, Enabled = false, Margin = new Padding(2) };
@@ -189,6 +190,7 @@ internal sealed class DashboardForm : Form
         public void Update(int usedSeconds, int budgetSeconds, int leftSeconds, int bonusMinutes, string noLimitText = "no limit")
         {
             var extra = bonusMinutes > 0 ? $" (incl. +{bonusMinutes} min extra)" : "";
+            _buttons.Visible = budgetSeconds >= 0; // extra time makes no sense without a limit
             if (budgetSeconds < 0)
             {
                 _left.Text = $"{Fmt(usedSeconds)} used";
