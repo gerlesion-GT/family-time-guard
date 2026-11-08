@@ -74,26 +74,21 @@ jobs:
           if ($report.enforced) { throw 'Runner session should not be enforced' }
 
           # The tray helper runs as the (non-admin) child: check such an account can talk to the Guard.
-          $out = 'C:\Users\Public\ftg-pipe-test.txt'
-          Remove-Item $out -ErrorAction SilentlyContinue
-          $script = @'
+          Add-Type -Namespace Ftg -Name Logon -MemberDefinition '[DllImport("advapi32.dll", SetLastError=true, CharSet=CharSet.Unicode)] public static extern bool LogonUser(string user, string domain, string password, int type, int provider, out IntPtr token);'
+          $tok = [IntPtr]::Zero
+          if (-not [Ftg.Logon]::LogonUser('ftgkid', '.', 'Test-Passw0rd!x9', 2, 0, [ref]$tok)) { throw "LogonUser failed: $([Runtime.InteropServices.Marshal]::GetLastWin32Error())" }
+          $ctx = (New-Object System.Security.Principal.WindowsIdentity($tok)).Impersonate()
           try {
+            $who = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name
             $c = New-Object System.IO.Pipes.NamedPipeClientStream('.', 'FamilyTimeGuard', 'InOut')
             $c.Connect(5000)
             $w = New-Object System.IO.StreamWriter($c); $w.AutoFlush = $true
             $r = New-Object System.IO.StreamReader($c)
             $w.WriteLine('{"type":"report","foregroundTitle":"x","foregroundProcess":"y.exe"}')
-            "OK $env:USERNAME " + $r.ReadLine() | Set-Content C:\Users\Public\ftg-pipe-test.txt
-          } catch { "FAIL $env:USERNAME $($_.Exception.Message)" | Set-Content C:\Users\Public\ftg-pipe-test.txt }
-          '@
-          $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-          # Run it as the child account through Task Scheduler (works without an interactive sign-in).
-          $action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument "-NoProfile -EncodedCommand $enc" -WorkingDirectory 'C:\Users\Public'
-          Register-ScheduledTask -TaskName 'FtgPipeTest' -Action $action -User 'ftgkid' -Password 'Test-Passw0rd!x9' -RunLevel Limited | Out-Null
-          Start-ScheduledTask -TaskName 'FtgPipeTest'
-          for ($i = 0; $i -lt 60 -and -not (Test-Path $out); $i++) { Start-Sleep -Seconds 1 }
-          Unregister-ScheduledTask -TaskName 'FtgPipeTest' -Confirm:$false
-          $result = Get-Content $out -Raw
+            $result = "OK ftgkid as $who " + $r.ReadLine()
+            $c.Dispose()
+          } catch { $result = "FAIL $($_.Exception.Message)" }
+          finally { $ctx.Undo() }
           Write-Host "Child-account pipe test: $result"
           if ($result -notlike 'OK ftgkid*') { throw 'A standard (child) account cannot talk to the Guard' }
 
